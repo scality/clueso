@@ -57,3 +57,11 @@ typings/
 # dotenv environment variables file
 .env
 
+# jvm bits
+*.class
+*.log
+
+# ignore files 
+docker/logs/*
+# but keep the folder
+!docker/logs/.keep
