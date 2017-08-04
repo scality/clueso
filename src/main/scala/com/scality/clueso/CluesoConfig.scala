@@ -8,7 +8,9 @@ class CluesoConfig(config: Config) {
   val s3AccessKey = config.getString("s3_access_key")
   val s3SecretKey = config.getString("s3_secret_key")
   val checkpointPath = config.getString("checkpoint_path")
-  val outputPath = config.getString("output_path")
+  val outputBucketName = config.getString("output_bucket_name")
+  val outputBucketPath = config.getString("output_bucket_path")
+  val outputPath = s"s3a://$outputBucketName$outputBucketPath"
   val mergePath = config.getString("merge_path")
   val mergeFrequency = config.getDuration("merge_frequency")
   val triggerTime = config.getDuration("trigger_time")

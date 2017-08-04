@@ -1,12 +1,19 @@
 package com.scality.clueso
 
-import com.typesafe.config.ConfigFactory
+import java.io.File
+
+import com.typesafe.config.{Config, ConfigFactory}
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.streaming.ProcessingTime
+import org.apache.spark.sql.streaming.{OutputMode, ProcessingTime}
 
 object MetadataIngestionPipeline {
   def main(args: Array[String]): Unit = {
-    val config = new CluesoConfig(ConfigFactory.load)
+    require(args.length > 0, "specify configuration file")
+
+    val parsedConfig = ConfigFactory.parseFile(new File(args(0)))
+    val _config = ConfigFactory.load(parsedConfig)
+
+    val config = new CluesoConfig(_config)
 
     val spark = SparkSession
       .builder
@@ -31,13 +38,24 @@ object MetadataIngestionPipeline {
       .option("failOnDataLoss", "false")
       .load()
 
+    val outputBucketName = config.outputBucketName
 
-    val writeStream = eventStream.select(
-        from_json(col("value").cast("string"), CluesoConstants.sstSchema)
+    val writeStream = eventStream.select(trim(col("value").cast("string")).as("content"))
+      .filter(col("content").isNotNull)
+      .filter(length(col("content")).gt(3))
+      .select(
+        from_json(col("content").cast("string"), CluesoConstants.sstSchema)
           .alias("message")
       )
-      .filter(row => row.getStruct(row.fieldIndex("message")) != null)
-      .withColumn("bucket", col("message.bucket"))
+      .filter(col("message").isNotNull)
+      .withColumn("bucket",
+        when(
+          col("message").isNotNull.and(
+            col("message.bucket").isNotNull
+          ), col("message.bucket")).otherwise("NOBUCKET")
+      )
+      .filter(!col("bucket").eqNullSafe(outputBucketName))
+
       .writeStream
       .trigger(ProcessingTime(config.triggerTime.toMillis))
 
@@ -45,9 +63,18 @@ object MetadataIngestionPipeline {
       .option("checkpointLocation", config.checkpointPath)
       .format("parquet")
       .partitionBy("bucket")
+      .outputMode(OutputMode.Append())
       .option("path", config.outputPath)
       .start()
 
     query.awaitTermination()
+  }
+
+  def printConfig(config : Config) = {
+    import com.typesafe.config.ConfigRenderOptions
+    val renderOpts = ConfigRenderOptions.defaults().setOriginComments(false).setComments(false).setJson(false)
+    println(" ===== CONFIG  =====")
+    println(config.root().render(renderOpts))
+    println(" ===== END OF CONFIG  =====")
   }
 }
