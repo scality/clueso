@@ -15,11 +15,16 @@ targetCompatibility = 1.8
 
 configurations {
     provided
+    compile.extendsFrom provided
 }
 
 sourceSets {
     main {
         compileClasspath += configurations.provided
+
+        resources {
+            filter.exclude("application.conf")
+        }
     }
 }
 
@@ -73,7 +78,17 @@ jar {
                 'Implementation-Version': version,
                 'Main-Class': mainClassFile
     }
-    include{sourceSets.main.output.classesDir}
+    dependsOn configurations.runtime
+    from {
+        (configurations.runtime - configurations.provided).collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    } {
+        exclude "META-INF/*.SF"
+        exclude "META-INF/*.DSA"
+        exclude "META-INF/*.RSA"
+        exclude "application.conf"
+    }
     zip64 true
 }
 
