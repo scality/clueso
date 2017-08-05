@@ -23,7 +23,7 @@ object MetadataIngestionPipeline {
       .config("spark.hadoop.fs.s3a.access.key", config.s3AccessKey)
       .config("spark.hadoop.fs.s3a.secret.key", config.s3SecretKey)
       .master("local[*]")
-      .appName("S3ATest")
+      .appName("Metadata Ingestion Pipeline")
       .getOrCreate()
 
 
@@ -38,7 +38,7 @@ object MetadataIngestionPipeline {
       .option("failOnDataLoss", "false")
       .load()
 
-    val outputBucketName = config.outputBucketName
+    val bucketName = config.bucketName
 
     val writeStream = eventStream.select(trim(col("value").cast("string")).as("content"))
       .filter(col("content").isNotNull)
@@ -54,7 +54,7 @@ object MetadataIngestionPipeline {
             col("message.bucket").isNotNull
           ), col("message.bucket")).otherwise("NOBUCKET")
       )
-      .filter(!col("bucket").eqNullSafe(outputBucketName))
+      .filter(!col("bucket").eqNullSafe(bucketName))
 
       .writeStream
       .trigger(ProcessingTime(config.triggerTime.toMillis))
@@ -64,7 +64,7 @@ object MetadataIngestionPipeline {
       .format("parquet")
       .partitionBy("bucket")
       .outputMode(OutputMode.Append())
-      .option("path", config.outputPath)
+      .option("path", config.landingPath)
       .start()
 
     query.awaitTermination()

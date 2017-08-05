@@ -22,9 +22,13 @@ class MergeService(config : CluesoConfig) {
   quartz.scheduleJob(job, trigger)
 
 
+  val merger = new TableFilesMerger(config)
+
   class MergeParquetFilesJob extends Job {
     override def execute(jobExecutionContext: JobExecutionContext) = {
       println("Check merge conditions")
+
+      merger.merge()
     }
   }
 }
