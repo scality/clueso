@@ -64,7 +64,7 @@ class TableFilesMerger(config: CluesoConfig) {
   val partDirnamePattern = "([A-Za-z0-9_]+)=(.*)".r
 
   def merge() = {
-    // go thru all partitions and see which ones are illegible for merging
+    // go thru all partitions and see which ones are eligible for merging
     val landingPartitionsIt = fs.listStatusIterator(new Path(config.landingPath))
 
     while (landingPartitionsIt.hasNext) {

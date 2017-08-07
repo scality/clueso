@@ -43,10 +43,9 @@ dependencies {
     compile "org.scala-lang:scala-compiler:"+scalaVersion
 
     compile 'org.apache.spark:spark-sql_2.11:2.1.0'
-    compile 'org.apache.spark:spark-streaming-kafka-0-10_2.11:2.1.0'
     compile 'org.apache.spark:spark-sql-kafka-0-10_2.11:2.1.0'
-    compile 'org.apache.spark:spark-launcher_2.11:2.1.0'
-    compile 'org.apache.spark:spark-catalyst_2.11:2.1.0'
+//    compile 'org.apache.spark:spark-launcher_2.11:2.1.0'
+//    compile 'org.apache.spark:spark-catalyst_2.11:2.1.0'
     compile 'org.apache.spark:spark-streaming_2.11:2.1.0'
     compile 'org.apache.spark:spark-core_2.11:2.1.0'
 
