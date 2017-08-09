@@ -1,42 +1,19 @@
 package com.scality.clueso.merge
 
 import java.io.File
-import java.net.URI
 import java.util.{Date, UUID}
 
-import com.scality.clueso.{CluesoConfig, CluesoConstants}
+import com.scality.clueso.SparkUtils.parquetFilesFilter
+import com.scality.clueso.{CluesoConfig, CluesoConstants, SparkUtils}
 import com.typesafe.config.ConfigFactory
-import org.apache.hadoop.conf.{Configuration => HadoopConfig}
-import org.apache.hadoop.fs.{FileSystem, Path, PathFilter}
+import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions.{col, dense_rank}
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 
-class TableFilesMerger(config: CluesoConfig) {
-  val parquetFilesFilter = new PathFilter {
-    override def accept(path: Path): Boolean = path.getName.endsWith(".parquet")
-  }
+class TableFilesMerger(spark : SparkSession, config: CluesoConfig) {
 
-  def hadoopConfig(config: CluesoConfig): HadoopConfig = {
-    val c = new HadoopConfig()
-    c.set("fs.s3a.connection.ssl.enabled", config.s3SslEnabled)
-    c.set("fs.s3a.endpoint", config.s3Endpoint)
-    c.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-    c.set("fs.s3a.access.key", config.s3AccessKey)
-    c.set("fs.s3a.secret.key", config.s3SecretKey)
-    c
-  }
-
-  val fs = FileSystem.get(new URI(config.mergePath), hadoopConfig(config))
-
-  val spark = SparkSession
-    .builder
-    .config("spark.hadoop.fs.s3a.connection.ssl.enabled", config.s3SslEnabled)
-    .config("spark.hadoop.fs.s3a.endpoint", config.s3Endpoint)
-    .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-    .config("spark.hadoop.fs.s3a.access.key", config.s3AccessKey)
-    .config("spark.hadoop.fs.s3a.secret.key", config.s3SecretKey)
-    .master("local[*]")
-    .appName("Table Files Merger")
-    .getOrCreate()
+  val fs = SparkUtils.buildHadoopFs(config)
 
 
   case class MergeInstructions(numPartitions : Int)
@@ -93,6 +70,7 @@ class TableFilesMerger(config: CluesoConfig) {
 
   def writeMergedData(mergedData: Dataset[Row], outputPath: String) = {
     mergedData.write
+//      .mode(SaveMode.Overwrite)
       .parquet(outputPath)
   }
 
@@ -153,25 +131,31 @@ class TableFilesMerger(config: CluesoConfig) {
   def releaseLock(path : String) = fs.delete(new Path(path), false)
 
   def readLandingAndStagingTableData(landingPartPath : String, stagingPartPath : String) = {
-    val landingData = spark.read
-      .schema(CluesoConstants.sstSchema)
+    val landingTable = spark.read
+      .schema(CluesoConstants.storedEventSchema)
       .parquet(landingPartPath)
 
     val stagingPath = new Path(stagingPartPath)
     if (!fs.exists(stagingPath)) {
       fs.mkdirs(stagingPath)
-      landingData
+      landingTable.where(col("message.type") =!= "delete")
     } else {
       try {
-        val stagingData = spark.read
-          .schema(CluesoConstants.sstSchema)
+        val stagingTable = spark.read
+          .schema(CluesoConstants.storedEventSchema)
           .parquet(stagingPartPath)
 
-        // TODO distinct on event unique key
-        landingData
-          .union(stagingData)
-          .distinct()
+        // window function over union of partitions bucketName=<specified bucketName>
+        val windowSpec = Window.partitionBy("message.key").orderBy(col("kafkaTimestamp").desc)
 
+        var union = landingTable
+          .union(stagingTable)
+//          .orderBy(col("message.key"))
+          .withColumn("rank", dense_rank().over(windowSpec))
+          .where(col("rank") === 1)
+          .where(col("message.type") =!= "delete")
+
+        union
       } catch {
         case t:Throwable => {
           println(t)
@@ -192,7 +176,13 @@ object TableFilesMerger {
 
     val config = new CluesoConfig(_config)
 
-    val merger = new TableFilesMerger(config)
+    val spark = SparkUtils.buildSparkSession(config)
+      .master("local[*]")
+      .appName("Table Files Merger")
+      .getOrCreate()
+
+
+    val merger = new TableFilesMerger(spark, config)
 
     merger.merge()
   }

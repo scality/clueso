@@ -1,10 +1,11 @@
 package com.scality.clueso.merge
 
 import com.scality.clueso.CluesoConfig
+import org.apache.spark.sql.SparkSession
 import org.quartz._
 import org.quartz.impl.StdSchedulerFactory
 
-class MergeService(config : CluesoConfig) {
+class MergeService(spark : SparkSession, config : CluesoConfig) {
   lazy val quartz = StdSchedulerFactory.getDefaultScheduler
 
   val trigger: Trigger = TriggerBuilder
@@ -22,7 +23,7 @@ class MergeService(config : CluesoConfig) {
   quartz.scheduleJob(job, trigger)
 
 
-  val merger = new TableFilesMerger(config)
+  val merger = new TableFilesMerger(spark, config)
 
   class MergeParquetFilesJob extends Job {
     override def execute(jobExecutionContext: JobExecutionContext) = {

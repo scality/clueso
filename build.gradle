@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'com.github.johnrengelman.shadow' version '1.2.3'
+    id "com.github.maiflai.scalatest" version "0.16"
 }
 
 group 'com.scality.clueso'
@@ -44,8 +45,6 @@ dependencies {
 
     compile 'org.apache.spark:spark-sql_2.11:2.1.0'
     compile 'org.apache.spark:spark-sql-kafka-0-10_2.11:2.1.0'
-//    compile 'org.apache.spark:spark-launcher_2.11:2.1.0'
-//    compile 'org.apache.spark:spark-catalyst_2.11:2.1.0'
     compile 'org.apache.spark:spark-streaming_2.11:2.1.0'
     compile 'org.apache.spark:spark-core_2.11:2.1.0'
 
@@ -55,6 +54,9 @@ dependencies {
     compile group: 'org.quartz-scheduler', name: 'quartz', version: '2.3.0'
 
     compile group: 'commons-io', name: 'commons-io', version: '2.5'
+
+    testCompile 'org.scalatest:scalatest_2.11:3.0.1'
+    testRuntime 'org.pegdown:pegdown:1.4.2'
 }
 
 task run(type: JavaExec, dependsOn: classes) {
@@ -105,4 +107,8 @@ idea {
         // uber/shaded jar dependencies. Make it so!
         scopes.PROVIDED.plus += [ configurations.provided ]
     }
+}
+
+test {
+    maxParallelForks = 1
 }

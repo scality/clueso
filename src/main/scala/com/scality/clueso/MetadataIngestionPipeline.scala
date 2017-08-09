@@ -3,10 +3,45 @@ package com.scality.clueso
 import java.io.File
 
 import com.typesafe.config.{Config, ConfigFactory}
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.{OutputMode, ProcessingTime}
+import org.apache.spark.sql.types.{StringType, TimestampType}
 
 object MetadataIngestionPipeline {
+
+  /**
+    * Applies projections and conditions to incoming data frame
+    * Ignores malformed json and garbage payloads
+    * Ignores events from specified bucket name
+    *
+    * @param bucketNameToFilterOut
+    * @param eventStream
+    * @return
+    */
+  def filterAndParseEvents(bucketNameToFilterOut : String, eventStream: DataFrame) = {
+    eventStream.select(
+      col("timestamp").cast(TimestampType).as("kafkaTimestamp"),
+      trim(col("value").cast(StringType)).as("content")
+    )
+      // defensive filtering to not process kafka garbage
+      .filter(col("content").isNotNull)
+      .filter(length(col("content")).gt(3))
+      .select(
+        col("kafkaTimestamp"),
+        from_json(col("content"), CluesoConstants.eventSchema)
+          .alias("message")
+      )
+      .filter(col("message").isNotNull)
+      .withColumn("bucket",
+        when(
+          col("message").isNotNull.and(
+            col("message.bucket").isNotNull
+          ), col("message.bucket")).otherwise("NOBUCKET")
+      )
+      .filter(!col("bucket").eqNullSafe(bucketNameToFilterOut))
+  }
+
   def main(args: Array[String]): Unit = {
     require(args.length > 0, "specify configuration file")
 
@@ -15,19 +50,10 @@ object MetadataIngestionPipeline {
 
     val config = new CluesoConfig(_config)
 
-    val spark = SparkSession
-      .builder
-      .config("spark.hadoop.fs.s3a.connection.ssl.enabled", config.s3SslEnabled)
-      .config("spark.hadoop.fs.s3a.endpoint", config.s3Endpoint)
-      .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-      .config("spark.hadoop.fs.s3a.access.key", config.s3AccessKey)
-      .config("spark.hadoop.fs.s3a.secret.key", config.s3SecretKey)
+    val spark = SparkUtils.buildSparkSession(config)
       .master("local[*]")
       .appName("Metadata Ingestion Pipeline")
       .getOrCreate()
-
-
-    import org.apache.spark.sql.functions._
 
     val eventStream = spark.readStream
       .format("kafka")
@@ -38,25 +64,7 @@ object MetadataIngestionPipeline {
       .option("failOnDataLoss", "false")
       .load()
 
-    val bucketName = config.bucketName
-
-    val writeStream = eventStream.select(trim(col("value").cast("string")).as("content"))
-      .filter(col("content").isNotNull)
-      .filter(length(col("content")).gt(3))
-      .select(
-        from_json(col("content").cast("string"), CluesoConstants.sstSchema)
-          .alias("message")
-      )
-      .filter(col("message").isNotNull)
-      .withColumn("bucket",
-        when(
-          col("message").isNotNull.and(
-            col("message.bucket").isNotNull
-          ), col("message.bucket")).otherwise("NOBUCKET")
-      )
-      .filter(!col("bucket").eqNullSafe(bucketName))
-
-      .writeStream
+    val writeStream = filterAndParseEvents(config.bucketName, eventStream).writeStream
       .trigger(ProcessingTime(config.triggerTime.toMillis))
 
     val query = writeStream

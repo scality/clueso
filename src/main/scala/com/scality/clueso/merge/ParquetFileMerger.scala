@@ -11,7 +11,7 @@ object ParquetFileMerger {
     val outputPath = config.mergePath + "/" + mergeOutputId
 
     val data = spark.read
-        .schema(CluesoConstants.sstSchema)
+        .schema(CluesoConstants.eventSchema)
         .parquet(path)
 
     val numRecords = data.count
