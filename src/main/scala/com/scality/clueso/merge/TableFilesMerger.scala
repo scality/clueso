@@ -95,6 +95,8 @@ class TableFilesMerger(spark : SparkSession, config: CluesoConfig) {
   }
 
   def mergePartition(partitionColumnName : String, partitionValue : String, numPartitions : Int) = {
+    println(s"Merging partition $partitionColumnName=$partitionValue into $numPartitions files")
+
     val mergeOutputId = UUID.randomUUID()
     val mergePath = s"${config.mergePath}/$mergeOutputId"
     val outputPath = s"$mergePath/merged_data"

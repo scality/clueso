@@ -24,10 +24,11 @@ class MergeService(spark : SparkSession, config : CluesoConfig) {
 
 
   val merger = new TableFilesMerger(spark, config)
+  println("Merge service running")
 
   class MergeParquetFilesJob extends Job {
     override def execute(jobExecutionContext: JobExecutionContext) = {
-      println("Check merge conditions")
+      println("Merge service execution")
 
       merger.merge()
     }

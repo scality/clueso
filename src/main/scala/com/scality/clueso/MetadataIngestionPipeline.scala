@@ -2,6 +2,7 @@ package com.scality.clueso
 
 import java.io.File
 
+import com.scality.clueso.merge.MergeService
 import com.typesafe.config.{Config, ConfigFactory}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
@@ -54,6 +55,8 @@ object MetadataIngestionPipeline {
       .master("local[*]")
       .appName("Metadata Ingestion Pipeline")
       .getOrCreate()
+
+    val mergerService = new MergeService(spark, config)
 
     val eventStream = spark.readStream
       .format("kafka")
