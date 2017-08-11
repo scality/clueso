@@ -29,6 +29,7 @@ object SparkUtils {
       .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
       .config("spark.hadoop.fs.s3a.access.key", config.s3AccessKey)
       .config("spark.hadoop.fs.s3a.secret.key", config.s3SecretKey)
+      .config("spark.hadoop.fs.s3a.path.style.access", config.s3PathStyleAccess)
   }
 
   val parquetFilesFilter = new PathFilter {

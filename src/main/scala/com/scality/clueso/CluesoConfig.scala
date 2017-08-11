@@ -7,6 +7,7 @@ class CluesoConfig(config: Config) {
   val s3Endpoint = config.getString("s3_endpoint")
   val s3AccessKey = config.getString("s3_access_key")
   val s3SecretKey = config.getString("s3_secret_key")
+  val s3PathStyleAccess = config.getString("s3_path_style_access")
   val checkpointPath = config.getString("checkpoint_path")
 
   // locations
