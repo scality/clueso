@@ -39,14 +39,14 @@ repositories {
 }
 
 dependencies {
-    compile "org.scala-lang:scala-library:"+scalaVersion
-    compile "org.scala-lang:scala-reflect:"+scalaVersion
-    compile "org.scala-lang:scala-compiler:"+scalaVersion
+    provided "org.scala-lang:scala-library:"+scalaVersion
+    provided "org.scala-lang:scala-reflect:"+scalaVersion
+    provided "org.scala-lang:scala-compiler:"+scalaVersion
 
-    compile 'org.apache.spark:spark-sql_2.11:2.1.0'
-    compile 'org.apache.spark:spark-sql-kafka-0-10_2.11:2.1.0'
-    compile 'org.apache.spark:spark-streaming_2.11:2.1.0'
-    compile 'org.apache.spark:spark-core_2.11:2.1.0'
+    provided 'org.apache.spark:spark-sql_'+scalaVersion+':' + sparkVersion
+    provided 'org.apache.spark:spark-sql-kafka-0-10_'+scalaVersion+':' + sparkVersion
+    provided 'org.apache.spark:spark-streaming_'+scalaVersion+':' + sparkVersion
+    provided 'org.apache.spark:spark-core_'+scalaVersion+':' + sparkVersion
 
     compile 'org.apache.hadoop:hadoop-aws:2.7.2'
 
