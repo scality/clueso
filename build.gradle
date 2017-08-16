@@ -44,7 +44,7 @@ dependencies {
     provided "org.scala-lang:scala-compiler:"+scalaVersion
 
     provided 'org.apache.spark:spark-sql_'+scalaVersion+':' + sparkVersion
-    provided 'org.apache.spark:spark-sql-kafka-0-10_'+scalaVersion+':' + sparkVersion
+    compile 'org.apache.spark:spark-sql-kafka-0-10_'+scalaVersion+':' + sparkVersion
     provided 'org.apache.spark:spark-streaming_'+scalaVersion+':' + sparkVersion
     provided 'org.apache.spark:spark-core_'+scalaVersion+':' + sparkVersion
 
