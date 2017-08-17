@@ -1,9 +1,8 @@
 package com.scality.clueso
 
-import java.io.File
-
 import com.scality.clueso.merge.MergeService
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.{OutputMode, ProcessingTime}
@@ -46,13 +45,14 @@ object MetadataIngestionPipeline {
   def main(args: Array[String]): Unit = {
     require(args.length > 0, "specify configuration file")
 
-    val parsedConfig = ConfigFactory.parseFile(new File(args(0)))
-    val _config = ConfigFactory.load(parsedConfig)
+    val config = SparkUtils.loadCluesoConfig(args.head)
 
-    val config = new CluesoConfig(_config)
+    // create dir no matter what
+    val fs = SparkUtils.buildHadoopFs(config)
+    fs.mkdirs(new Path(config.landingPath))
+    fs.mkdirs(new Path(config.stagingPath))
 
     val spark = SparkUtils.buildSparkSession(config)
-      .master("local[*]")
       .appName("Metadata Ingestion Pipeline")
       .getOrCreate()
 

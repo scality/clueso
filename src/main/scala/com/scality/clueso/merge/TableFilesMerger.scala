@@ -48,7 +48,7 @@ class TableFilesMerger(spark : SparkSession, config: CluesoConfig) {
       val fileStatus = landingPartitionsIt.next()
 
       if (fileStatus.isDirectory &&
-        fileStatus.getPath.getName.matches(partDirnamePattern.regex)) {
+        fileStatus.getPath.getName.matches(partDirnamePattern.pattern.pattern())) {
 
         checkMergeEligibility(fileStatus.getPath) match {
           case Some(MergeInstructions(numPartitions)) => {
