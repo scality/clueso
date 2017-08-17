@@ -1,5 +1,6 @@
 package com.scality.clueso
 
+import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types._
 
 object CluesoConstants {
@@ -63,5 +64,26 @@ object CluesoConstants {
     .add("kafkaTimestamp", TimestampType, false)
     .add("message", new StructType(eventSchema.fields), false)
     .add("bucket", StringType, false)
+
+
+  val resultCols = Seq(col("message.key").as("key"),
+    col("message.`value`.`last-modified`").as("`last-modified`"),
+    col("message.`value`.`content-md5`").as("`content-md5`"), // etag
+    col("message.`value`.`owner-id`").as("`owner-id`"),
+    col("message.`value`.`owner-display-name`").as("`owner-display-name`"),
+    col("message.`value`.`content-length`").as("`content-length`"),
+    col("message.`value`.`x-amz-storage-class`").as("`x-amz-storage-class`"),
+    col("bucket")
+  )
+
+  val resultSchema = new StructType()
+    .add("key", StringType, true)
+    .add("`last-modified`", StringType, true)
+    .add("`content-md5`", StringType, true)
+    .add("`owner-id`", StringType, true)
+    .add("`owner-display-name`", StringType, true)
+    .add("`content-length`", LongType, true)
+    .add("`x-amz-storage-class`", StringType, true)
+    .add("bucket", StringType, true)
 
 }
