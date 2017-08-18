@@ -32,15 +32,25 @@ class MetadataQuery(spark : SparkSession, config: CluesoConfig, bucketName : Str
 //
 //    println("landing schema:")
 //    landingTable.printSchema()
+//    var result = stagingTable.collect()
+//    result = landingTable.collect()
 
-    var result = stagingTable.collect()
-    result = landingTable.collect()
+    val colsLanding = landingTable.columns.toSet
+    val colsStaging = stagingTable.columns.toSet
+    val unionCols = colsLanding ++ colsStaging
+
+    def expr(myCols: Set[String], allCols: Set[String]) = {
+      allCols.toList.map(x => x match {
+        case x if myCols.contains(x) => col(x)
+        case _ => lit(null).as(x)
+      })
+    }
 
     // window function over union of partitions bucketName=<specified bucketName>
     val windowSpec = Window.partitionBy("message.key").orderBy(col("kafkaTimestamp").desc)
 
-    var union = landingTable
-      .union(stagingTable)
+    var union = landingTable.select(expr(colsLanding, unionCols):_*)
+      .union(stagingTable.select(expr(colsStaging, unionCols):_*))
       .orderBy(col("message.key"))
       .withColumn("rank", dense_rank().over(windowSpec))
       .where(col("rank").lt(2).and(col("message.type") =!= "delete"))
@@ -54,8 +64,8 @@ class MetadataQuery(spark : SparkSession, config: CluesoConfig, bucketName : Str
 
 
 
-//    union.select(CluesoConstants.resultCols: _*)
-    union
+    union.select(CluesoConstants.resultCols: _*)
+//    union
   }
 }
 
