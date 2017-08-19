@@ -33,7 +33,7 @@ object CluesoConstants {
       .add("READ", new ArrayType(StringType, false))
       .add("READ_ACP", new ArrayType(StringType, false)))
     .add("location", new ArrayType(locationSchema, false))
-    .add("tagging", new MapType(StringType, StringType, false), true)
+    .add("tags", new MapType(StringType, StringType, false), true)
     .add("replicationInfo", replicationInfoSchema)
     .add("md-model-version", IntegerType)
     .add("owner-display-name", StringType)
