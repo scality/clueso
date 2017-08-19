@@ -55,6 +55,7 @@ dependencies {
 
     compile group: 'commons-io', name: 'commons-io', version: '2.5'
 
+    testRuntime 'org.apache.hadoop:hadoop-aws:2.7.2'
     testCompile 'org.scalatest:scalatest_2.11:3.0.1'
     testRuntime 'org.pegdown:pegdown:1.4.2'
 }
@@ -111,4 +112,5 @@ idea {
 
 test {
     maxParallelForks = 1
+//    debug = true
 }

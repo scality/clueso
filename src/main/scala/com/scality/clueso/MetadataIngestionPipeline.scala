@@ -20,26 +20,36 @@ object MetadataIngestionPipeline {
     * @return
     */
   def filterAndParseEvents(bucketNameToFilterOut : String, eventStream: DataFrame) = {
-    eventStream.select(
+    var df = eventStream.select(
       col("timestamp").cast(TimestampType).as("kafkaTimestamp"),
       trim(col("value").cast(StringType)).as("content")
     )
       // defensive filtering to not process kafka garbage
-      .filter(col("content").isNotNull)
-      .filter(length(col("content")).gt(3))
-      .select(
-        col("kafkaTimestamp"),
-        from_json(col("content"), CluesoConstants.eventSchema)
-          .alias("message")
+    df = df.filter(col("content").isNotNull)
+          .filter(length(col("content")).gt(3))
+          .select(
+            col("kafkaTimestamp"),
+            from_json(col("content"), CluesoConstants.eventSchema)
+              .alias("event")
+          )
+
+    df = df.filter(col("event").isNotNull.and(col("event.type").isNotNull))
+      .withColumn("key", when(
+        col("event").isNotNull.and(
+          col("event.key").isNotNull
+        ), col("event.key")).otherwise("")
       )
-      .filter(col("message").isNotNull)
       .withColumn("bucket",
         when(
-          col("message").isNotNull.and(
-            col("message.bucket").isNotNull
-          ), col("message.bucket")).otherwise("NOBUCKET")
+          col("event").isNotNull.and(
+            col("event.bucket").isNotNull
+          ), col("event.bucket")).otherwise("NOBUCKET")
       )
-      .filter(!col("bucket").eqNullSafe(bucketNameToFilterOut))
+      .withColumn("type", col("event.type"))
+      .withColumn("message", col("event.value"))
+
+    df = df.filter(!col("bucket").eqNullSafe(bucketNameToFilterOut))
+    df.drop("event")
   }
 
   def main(args: Array[String]): Unit = {

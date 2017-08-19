@@ -1,18 +1,20 @@
 version: '2'
 services:
-  livy:
-    image: tobby48/spark-livy:0.3_2.1
-    volumes:
-      - ./logs/livy:/apps/livy/logs
-      - ./conf/livy.conf:/apps/livy/conf/livy.conf
-      - ./conf/log4j.properties:/apps/livy/conf/log4j.properties
-      - ./jars:/apps/spark-modules
-    ports:
-      - "8998:8998"
-      - "4040:4040"
-      - "5005:5005"
-    depends_on:
-      - kafka
+#  livy:
+#    image: scality/clueso-livy:test3
+#    volumes:
+#      - ./logs/livy:/apps/livy/logs
+#      - ./conf/livy.conf:/apps/livy/conf/livy.conf
+#      - ./conf/livy-env.sh:/apps/livy/conf/livy-env.sh
+#      - ./conf/log4j.properties:/apps/livy/conf/log4j.properties
+#      - ./spark_builds/spark-2.1.1-bin-spark-2.1.1_2.10:/apps/spark-2.1.1_2.10
+#      - ./jars:/apps/spark-modules
+#    ports:
+#      - "8998:8998"
+#      - "4040:4040"
+#      - "5005:5005"
+#    depends_on:
+#      - kafka
 
   spark-master:
     image: bde2020/spark-master:2.1.1-hadoop2.7

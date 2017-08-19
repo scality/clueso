@@ -8,6 +8,7 @@ import com.typesafe.config.ConfigFactory
 import org.apache.hadoop.conf.{Configuration => HadoopConfig}
 import org.apache.hadoop.fs.{FileSystem, Path, PathFilter}
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.{col, lit}
 
 object SparkUtils {
   def loadCluesoConfig(confFilePath: String) = {
@@ -34,6 +35,9 @@ object SparkUtils {
   def buildSparkSession(config : CluesoConfig) = {
     SparkSession
       .builder
+      .config("spark.sql.parquet.cacheMetadata", "false")
+      .config("spark.hadoop.fs.s3a.fast.upload", "true")
+      .config("spark.hadoop.fs.s3a.buffer.dir", "./tmp")
       .config("spark.hadoop.fs.s3a.connection.ssl.enabled", config.s3SslEnabled)
       .config("spark.hadoop.fs.s3a.endpoint", config.s3Endpoint)
       .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
@@ -43,6 +47,9 @@ object SparkUtils {
   }
 
   def confSparkSession(spark : SparkSession, config : CluesoConfig) = {
+    spark.conf.set("spark.sql.parquet.cacheMetadata", "false")
+    spark.conf.set("spark.hadoop.fs.s3a.fast.upload", "true")
+    spark.conf.set("spark.hadoop.fs.s3a.buffer.dir", "/tmp")
     spark.conf.set("spark.hadoop.fs.s3a.connection.ssl.enabled", config.s3SslEnabled)
     spark.conf.set("spark.hadoop.fs.s3a.endpoint", config.s3Endpoint)
     spark.conf.set("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
@@ -63,4 +70,14 @@ object SparkUtils {
   val parquetFilesFilter = new PathFilter {
     override def accept(path: Path): Boolean = path.getName.endsWith(".parquet")
   }
+
+
+
+  def fillNonExistingColumns(myCols: Set[String], allCols: Set[String]) = {
+    allCols.toList.map(x => x match {
+      case x if myCols.contains(x) => col(x)
+      case _ => lit(null).as(x)
+    })
+  }
+
 }

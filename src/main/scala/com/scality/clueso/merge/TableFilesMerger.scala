@@ -9,7 +9,7 @@ import com.typesafe.config.ConfigFactory
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{col, dense_rank}
-import org.apache.spark.sql.{Dataset, Row, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 
 class TableFilesMerger(spark : SparkSession, config: CluesoConfig) {
 
@@ -42,7 +42,7 @@ class TableFilesMerger(spark : SparkSession, config: CluesoConfig) {
 
   def merge() = {
     // go thru all partitions and see which ones are eligible for merging
-    val landingPartitionsIt = fs.listStatusIterator(new Path(config.landingPath))
+    val landingPartitionsIt = fs.listStatus(new Path(config.landingPath)).iterator
 
     while (landingPartitionsIt.hasNext) {
       val fileStatus = landingPartitionsIt.next()
@@ -132,37 +132,53 @@ class TableFilesMerger(spark : SparkSession, config: CluesoConfig) {
 
   def releaseLock(path : String) = fs.delete(new Path(path), false)
 
-  def readLandingAndStagingTableData(landingPartPath : String, stagingPartPath : String) = {
+  def readLandingAndStagingTableData(landingPartPath : String, stagingPartPath : String) : DataFrame = {
     val landingTable = spark.read
       .schema(CluesoConstants.storedEventSchema)
       .parquet(landingPartPath)
 
     val stagingPath = new Path(stagingPartPath)
-    if (!fs.exists(stagingPath)) {
-      fs.mkdirs(stagingPath)
-      landingTable.where(col("message.type") =!= "delete")
-    } else {
-      try {
+
+    var union : Option[DataFrame] = None
+
+    try {
+      if (!fs.exists(stagingPath)) {
+        fs.mkdirs(stagingPath)
+        union = Some(landingTable)
+      } else {
         val stagingTable = spark.read
           .schema(CluesoConstants.storedEventSchema)
           .parquet(stagingPartPath)
 
-        // window function over union of partitions bucketName=<specified bucketName>
-        val windowSpec = Window.partitionBy("message.key").orderBy(col("kafkaTimestamp").desc)
+        val colsLanding = landingTable.columns.toSet
+        val colsStaging = stagingTable.columns.toSet
+        val unionCols = colsLanding ++ colsStaging
 
-        var union = landingTable
-          .union(stagingTable)
-//          .orderBy(col("message.key"))
+        import SparkUtils.fillNonExistingColumns
+
+        union = Some(
+          landingTable
+            .select(fillNonExistingColumns(colsLanding, unionCols): _*)
+            .union(
+              stagingTable
+                .select(fillNonExistingColumns(colsStaging, unionCols): _*))
+            .toDF())
+      }
+
+      // window function over union of partitions bucketName=<specified bucketName>
+      val windowSpec = Window.partitionBy("key").orderBy(col("kafkaTimestamp").desc)
+
+      union.map(unionTable => {
+        unionTable.orderBy(col("key"))
           .withColumn("rank", dense_rank().over(windowSpec))
-          .where(col("rank") === 1)
-          .where(col("message.type") =!= "delete")
+          .where((col("rank") === 1).and(col("type") =!= "delete"))
+          .drop("rank")
+      }).getOrElse(spark.emptyDataFrame)
 
-        union
-      } catch {
-        case t:Throwable => {
-          println(t)
-          throw t
-        }
+    } catch {
+      case t:Throwable => {
+        println(t)
+        throw t
       }
     }
   }
