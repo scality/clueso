@@ -8,6 +8,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import scala.util.Try
 
 class MetadataQuery(spark : SparkSession, config: CluesoConfig, bucketName : String, sqlWhereExpr : String, start : Int, end : Int) {
+  override def toString: String = s"[MetadataQuery bucket=${bucketName}, query=$sqlWhereExpr, start=$start, end=$end]"
+
   def hasColumn(df: DataFrame, path: String) = Try(df(path)).isSuccess
 
   def execute() = {
@@ -59,71 +61,12 @@ class MetadataQuery(spark : SparkSession, config: CluesoConfig, bucketName : Str
       .where(col("rank").lt(2).and(col("type") =!= "delete"))
 
 
-//    union.explain(true)
-
-//    val sparkExpression : Expression = CluesoQueryExpressionUtils.parseCluesoExpr(sqlWhereExpr)(spark)
-
-//    def filterExpression(expression: Expression, df : DataFrame) = {
-//      if (expression.isInstanceOf[BinaryOperator]) {
-//        val binOp = expression.asInstanceOf[BinaryOperator]
-//
-//        if (binOp.left.isInstanceOf[UnresolvedAttribute]) {
-//          val unrAttr = binOp.left.asInstanceOf[UnresolvedAttribute]
-//          val possibleColumns = expandPossibleColumns(unrAttr, df)
-//
-//          val ctor : Constructor[_ <: BinaryOperator] = binOp.getClass
-//            .getConstructor(classOf[UnresolvedAttribute], binOp.right.getClass)
-//
-//          val subExpr = possibleColumns.map(attr => ctor.newInstance(attr, binOp.right))
-//
-//          subExpr.tail.foldLeft(subExpr.head) { (expr, subExpr) => Or(expr, subExpr) }
-//
-//        } else {
-//          expression
-//        }
-//      } else {
-//        expression
-//      }
-//    }
-//
-//    def expandPossibleColumns(attribute: UnresolvedAttribute, df : DataFrame) = {
-//      var result = List[UnresolvedAttribute]()
-//
-//      if (schemaCols.contains(s"message.${attribute.name}")) {
-//        val newAttr = UnresolvedAttribute(s"message.${attribute.name}")
-//        result = newAttr :: result
-//      }
-//
-//      if (schemaCols.contains(s"message.userMd.${attribute.name}")) {
-//        val newAttr = UnresolvedAttribute(s"message.userMd.${attribute.name}")
-//        result = newAttr :: result
-//      }
-//
-//      // TODO TAGS
-////      if (schemaCols.contains(attribute.name)) {
-////        result = attribute :: result
-////      }
-//
-//      result
-//    }
-
-//    val xxx = filterExpression(sparkExpression, union)
-
-
-//    println(sparkExpression)
-//    println(xxx)
-
-//    val reWriteExpression
-
-
     if (!sqlWhereExpr.trim.isEmpty) {
       union = union.where(sqlWhereExpr)
     }
 
 
-
     union.select(CluesoConstants.resultCols: _*)
-//    union
   }
 }
 
