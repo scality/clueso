@@ -19,7 +19,7 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
   def execute(query : MetadataQuery) = {
     val bucketName = query.bucketName
 
-    if (!bucketDfs.contains(bucketName)) {
+    if (!config.cacheDataframes || !bucketDfs.contains(bucketName)) {
       val bucketDf = setupDf(spark, config, bucketName)
       bucketDfs = bucketDfs.updated(bucketName, new AtomicReference(bucketDf))
       bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
@@ -109,8 +109,6 @@ object MetadataQueryExecutor {
     val spark = SparkUtils.buildSparkSession(config)
       .appName("Query Executor")
       .getOrCreate()
-
-//    val queryExec = new MetadataQueryExecutor(spark, config)
 
     val bucketName = args(1) // e.g.   "wednesday"
     val sqlWhereExpr = args(2) // "color=blue AND (y=x OR y=g)"
