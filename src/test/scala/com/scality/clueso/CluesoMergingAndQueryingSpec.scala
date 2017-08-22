@@ -39,7 +39,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
         val queryExecutor = MetadataQueryExecutor(spark, config)
 
         // given
-        val query = new MetadataQuery(spark, config, "wednesday", """ message.userMd.`x-amz-meta-mymeta1` = 'thisisfun' """, 0, 1000)
+        val query = new MetadataQuery("wednesday", """ message.userMd.`x-amz-meta-mymeta1` = 'thisisfun' """, 0, 1000)
         var result = queryExecutor.execute(query)
 
         // then
@@ -78,7 +78,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
 
         // given
-        val query = new MetadataQuery(spark, config, "wednesday", "", 0, 1000)
+        val query = new MetadataQuery("wednesday", "", 0, 1000)
         var result = queryExecutor.execute(query)
 
 
@@ -141,7 +141,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
         val queryExecutor = MetadataQueryExecutor(spark, config)
 
         // given
-        val query = new MetadataQuery(spark, config, "wednesday", "", 0, 1000)
+        val query = new MetadataQuery("wednesday", "", 0, 1000)
         var result = queryExecutor.execute(query)
 
         // then

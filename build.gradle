@@ -114,5 +114,4 @@ idea {
 
 test {
     maxParallelForks = 1
-    debug = true
 }
