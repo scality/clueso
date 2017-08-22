@@ -1,6 +1,6 @@
 package com.scality.clueso
 
-import java.io.File
+import java.io.{File, IOException}
 import java.net.URI
 
 import com.scality.clueso.query.MetadataQuery
@@ -9,6 +9,7 @@ import org.apache.hadoop.conf.{Configuration => HadoopConfig}
 import org.apache.hadoop.fs.{FileSystem, Path, PathFilter}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, lit}
+
 
 object SparkUtils {
   def loadCluesoConfig(confFilePath: String) = {
@@ -29,6 +30,7 @@ object SparkUtils {
     c.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
     c.set("fs.s3a.access.key", config.s3AccessKey)
     c.set("fs.s3a.secret.key", config.s3SecretKey)
+    c.set("fs.s3a.path.style.access", config.s3PathStyleAccess)
     c
   }
 
@@ -56,22 +58,31 @@ object SparkUtils {
     spark.conf.set("spark.hadoop.fs.s3a.access.key", config.s3AccessKey)
     spark.conf.set("spark.hadoop.fs.s3a.secret.key", config.s3SecretKey)
     spark.conf.set("spark.hadoop.fs.s3a.path.style.access", config.s3PathStyleAccess)
+    spark.conf.set("fs.s3a.path.style.access", config.s3PathStyleAccess)
   }
 
   def getQueryResults(spark : SparkSession, query : MetadataQuery) = {
-//    import scala.util.parsing.json.JSONObject
-//
-//    val results = ()
-//
-//    results
-    query.execute.toJSON.collect
+    val result = query.execute
+
+    val resultArray = try
+      if (result.count() > 0) {
+        result.toJSON.collect
+      } else {
+        Array[String]()
+      }
+    catch {
+      case e:IOException => {
+        println(e)
+        Array[String]()
+      }
+    }
+
+    println("[" + resultArray.mkString(",") + "]")
   }
 
   val parquetFilesFilter = new PathFilter {
     override def accept(path: Path): Boolean = path.getName.endsWith(".parquet")
   }
-
-
 
   def fillNonExistingColumns(myCols: Set[String], allCols: Set[String]) = {
     allCols.toList.map(x => x match {

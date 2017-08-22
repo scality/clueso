@@ -33,4 +33,9 @@ class CluesoConfig(config: Config) {
 
   val kafkaBootstrapServers = config.getString("kafka_bootstrap_servers")
   val kafkaTopic = config.getString("kafka_topic")
+
+  import scala.collection.JavaConversions._
+  override def toString: String = config.entrySet().map { entry =>
+      s"  ${entry.getKey} = ${entry.getValue.toString}"
+    }.mkString("\n")
 }
