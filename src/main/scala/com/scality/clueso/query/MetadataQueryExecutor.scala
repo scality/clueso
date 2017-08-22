@@ -16,6 +16,10 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
   var bucketDfs = Map[String, AtomicReference[DataFrame]]()
   var bucketUpdateTs = Map[String, DateTime]()
 
+  def executeAndPrint(query : MetadataQuery) = {
+    SparkUtils.getQueryResults(spark, this, query)
+  }
+
   def execute(query : MetadataQuery) = {
     val bucketName = query.bucketName
 
@@ -116,10 +120,11 @@ object MetadataQueryExecutor {
 
     val queryExecutor = MetadataQueryExecutor(spark, config)
 
-    val query = MetadataQuery(spark, config, bucketName, sqlWhereExpr, start = 0, end = 1000)
-    val result = queryExecutor.execute(query)
+    var query : Option[MetadataQuery] = None
 
-    println(result)
+    query = Some(MetadataQuery(bucketName, sqlWhereExpr, start = 0, end = 1000))
+    queryExecutor.executeAndPrint(query.get)
+
   }
 
 }

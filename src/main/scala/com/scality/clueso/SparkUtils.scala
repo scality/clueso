@@ -66,7 +66,7 @@ object SparkUtils {
 
     val resultArray = try
       if (result.count() > 0) {
-        result.toJSON.collect
+        result.toJSON.collect.map(_.replaceAll("`",""))
       } else {
         Array[String]()
       }
