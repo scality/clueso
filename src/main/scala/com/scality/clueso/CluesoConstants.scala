@@ -67,12 +67,12 @@ object CluesoConstants {
 
 
   val resultCols = Seq(col("key"),
-    col("message.`last-modified`").as("`last-modified`"),
-    col("message.`content-md5`").as("`content-md5`"), // etag
-    col("message.`owner-id`").as("`owner-id`"),
-    col("message.`owner-display-name`").as("`owner-display-name`"),
-    col("message.`content-length`").as("`content-length`"),
-    col("message.`x-amz-storage-class`").as("`x-amz-storage-class`"),
+    col("`last-modified`").as("`last-modified`"),
+    col("`content-md5`").as("`content-md5`"), // etag
+    col("`owner-id`").as("`owner-id`"),
+    col("`owner-display-name`").as("`owner-display-name`"),
+    col("`content-length`").as("`content-length`"),
+    col("`x-amz-storage-class`").as("`x-amz-storage-class`"),
     col("bucket")
   )
 

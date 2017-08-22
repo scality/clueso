@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicReference
 import com.scality.clueso.{CluesoConfig, CluesoConstants, SparkUtils}
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions._
+import org.apache.spark.sql.functions.{col, _}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.joda.time.DateTime
 
@@ -45,8 +45,14 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
       resultDf = resultDf.where(sqlWhereExpr)
     }
 
+    if (query.start_key.isDefined) {
+      resultDf = resultDf.where(col("key") > lit(query.start_key.get))
+    }
 
-    resultDf.select(CluesoConstants.resultCols: _*)
+    resultDf
+      .select(CluesoConstants.resultCols: _*)
+      .orderBy(col("key"))
+      .limit(query.limit)
   }
 }
 
@@ -99,8 +105,37 @@ object MetadataQueryExecutor {
       .orderBy(col("key"))
       .withColumn("rank", dense_rank().over(windowSpec))
       .where(col("rank").lt(2).and(col("type") =!= "delete"))
+      .select(col("bucket"),
+        col("kafkaTimestamp"),
+        col("key"),
+        col("type"),
+        col("message.`userMd`").as("userMd"),
+        col("message.`incrementer`").as("incrementer"),
+        col("message.`sourceFileName`").as("sourceFileName"),
+        col("message.`acl`").as("acl"),
+        col("message.`location`").as("location"),
+        col("message.`tags`").as("tags"),
+        col("message.`replicationInfo`").as("replicationInfo"),
+        col("message.`md-model-version`").as("md-model-version"),
+        col("message.`owner-display-name`").as("owner-display-name"),
+        col("message.`owner-id`").as("owner-id"),
+        col("message.`content-length`").as("content-length"),
+        col("message.`content-type`").as("content-type"),
+        col("message.`last-modified`").as("last-modified"),
+        col("message.`content-md5`").as("content-md5"),
+        col("message.`x-amz-server-version-id`").as("x-amz-server-version-id"),
+        col("message.`x-amz-storage-class`").as("x-amz-storage-class"),
+        col("message.`x-amz-server-side-encryption`").as("x-amz-server-side-encryption"),
+        col("message.`x-amz-server-side-encryption-aws-kms-key-id`").as("x-amz-server-side-encryption-aws-kms-key-id"),
+        col("message.`x-amz-server-side-encryption-customer-algorithm`").as("x-amz-server-side-encryption-customer-algorithm"),
+        col("message.`x-amz-website-redirect-location`").as("x-amz-website-redirect-location"),
+        col("message.`isDeleteMarker`").as("isDeleteMarker"),
+        col("message.`x-amz-version-id`").as("x-amz-version-id"))
 
-    result.cache()
+    if (config.cacheDataframes)
+      result.cache()
+    else
+      result
   }
 
   def apply(spark: SparkSession, config: CluesoConfig): MetadataQueryExecutor = new MetadataQueryExecutor(spark, config)
@@ -122,9 +157,8 @@ object MetadataQueryExecutor {
 
     var query : Option[MetadataQuery] = None
 
-    query = Some(MetadataQuery(bucketName, sqlWhereExpr, start = 0, end = 1000))
+    query = Some(MetadataQuery(bucketName, sqlWhereExpr, start_key = None, limit = 1000))
     queryExecutor.executeAndPrint(query.get)
 
   }
-
 }
