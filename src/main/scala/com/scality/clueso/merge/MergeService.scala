@@ -43,7 +43,7 @@ class MergeService(spark : SparkSession, config : CluesoConfig) {
     .newTrigger
     .withIdentity("MergeTrigger", "Triggers")
     .withSchedule(SimpleScheduleBuilder.simpleSchedule()
-      .withIntervalInMilliseconds(config.mergeFrequency.toMillis))
+    .withIntervalInMilliseconds(config.mergeFrequency.toMillis))
     .build
 
 

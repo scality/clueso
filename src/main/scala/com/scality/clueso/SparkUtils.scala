@@ -3,7 +3,7 @@ package com.scality.clueso
 import java.io.{File, IOException}
 import java.net.URI
 
-import com.scality.clueso.query.MetadataQuery
+import com.scality.clueso.query.{MetadataQuery, MetadataQueryExecutor}
 import com.typesafe.config.ConfigFactory
 import org.apache.hadoop.conf.{Configuration => HadoopConfig}
 import org.apache.hadoop.fs.{FileSystem, Path, PathFilter}
@@ -61,8 +61,8 @@ object SparkUtils {
     spark.conf.set("fs.s3a.path.style.access", config.s3PathStyleAccess)
   }
 
-  def getQueryResults(spark : SparkSession, query : MetadataQuery) = {
-    val result = query.execute
+  def getQueryResults(spark : SparkSession, queryExecutor: MetadataQueryExecutor, query : MetadataQuery) = {
+    val result = queryExecutor.execute(query)
 
     val resultArray = try
       if (result.count() > 0) {

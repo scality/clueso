@@ -4,7 +4,7 @@ import java.io.File
 import java.sql.Timestamp
 
 import com.scality.clueso.merge.TableFilesMerger
-import com.scality.clueso.query.MetadataQuery
+import com.scality.clueso.query.{MetadataQuery, MetadataQueryExecutor}
 import com.typesafe.config.ConfigFactory
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -35,9 +35,12 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
           .parquet(config.landingPath)
 
 
+        // TODO cache?
+        val queryExecutor = MetadataQueryExecutor(spark, config)
+
         // given
         val query = new MetadataQuery(spark, config, "wednesday", """ message.userMd.`x-amz-meta-mymeta1` = 'thisisfun' """, 0, 1000)
-        var result = query.execute()
+        var result = queryExecutor.execute(query)
 
         // then
         result.count() shouldBe 1
@@ -70,9 +73,14 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
           .parquet(config.landingPath)
 
 
+        // TODO cache?
+        val queryExecutor = MetadataQueryExecutor(spark, config)
+
+
         // given
         val query = new MetadataQuery(spark, config, "wednesday", "", 0, 1000)
-        var result = query.execute()
+        var result = queryExecutor.execute(query)
+
 
         // then
         result.count() shouldBe 1
@@ -89,7 +97,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
           SparkUtils.parquetFilesFilter).length shouldEqual 0
 
         // given we query again (hits staging)
-        result = query.execute()
+        result = queryExecutor.execute(query)
 
         // then same result as before
         result.count() shouldBe 1
@@ -129,10 +137,12 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
           .mode(SaveMode.Overwrite)
           .parquet(config.landingPath)
 
+        // TODO cache?
+        val queryExecutor = MetadataQueryExecutor(spark, config)
 
         // given
         val query = new MetadataQuery(spark, config, "wednesday", "", 0, 1000)
-        var result = query.execute()
+        var result = queryExecutor.execute(query)
 
         // then
         result.count() shouldBe 1
@@ -149,7 +159,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
         fs.listStatus(new Path(config.landingPath, "bucket=wednesday"), SparkUtils.parquetFilesFilter).length shouldEqual 0
 
         // given we query again (hits staging)
-        result = query.execute()
+        result = queryExecutor.execute(query)
 
         // then same result as before
         result.count() shouldBe 1
