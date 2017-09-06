@@ -65,17 +65,28 @@ object MetadataQueryExecutor {
       col("type"),
       col("message"))
 
-    // read df
-    val stagingTable = spark.read
+
+    val _stagingTable = spark.read
       .schema(CluesoConstants.storedEventSchema)
       .parquet(config.stagingPath)
+      .createOrReplaceTempView("staging")
+
+    spark.catalog.refreshTable("staging")
+
+    // read df
+    val stagingTable = spark.table("staging")
       .where(col("bucket").eqNullSafe(bucketName))
       .select(cols: _*)
       .orderBy("key")
 
-    val landingTable = spark.read
+
+    val _landingTable = spark.read
       .schema(CluesoConstants.storedEventSchema)
       .parquet(config.landingPath)
+      .createOrReplaceTempView("landing")
+
+
+    val landingTable = spark.table("landing")
       .where(col("bucket").eqNullSafe(bucketName))
       .select(cols: _*)
       .orderBy("key")
