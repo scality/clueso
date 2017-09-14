@@ -46,6 +46,8 @@ object SparkUtils {
       .config("spark.hadoop.fs.s3a.access.key", config.s3AccessKey)
       .config("spark.hadoop.fs.s3a.secret.key", config.s3SecretKey)
       .config("spark.hadoop.fs.s3a.path.style.access", config.s3PathStyleAccess)
+      .config("spark.sql.streaming.metricsEnabled", "true")
+
   }
 
   def confSparkSession(spark : SparkSession, config : CluesoConfig) = {
@@ -59,6 +61,7 @@ object SparkUtils {
     spark.conf.set("spark.hadoop.fs.s3a.secret.key", config.s3SecretKey)
     spark.conf.set("spark.hadoop.fs.s3a.path.style.access", config.s3PathStyleAccess)
     spark.conf.set("fs.s3a.path.style.access", config.s3PathStyleAccess)
+    spark.conf.set("spark.sql.streaming.metricsEnabled", "true")
   }
 
   def getQueryResults(spark : SparkSession, queryExecutor: MetadataQueryExecutor, query : MetadataQuery) = {

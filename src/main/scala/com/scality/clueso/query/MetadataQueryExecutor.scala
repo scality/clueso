@@ -31,10 +31,12 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
       // check if the dataframe is 'old' and update
       if (bucketUpdateTs(bucketName).plus(config.mergeFrequency.toMillis).isBeforeNow) {
         // update dataframe
+        logger.info("Recycling dataframe")
         val bucketDf = setupDf(spark, config, bucketName)
 
         bucketDfs(bucketName).get().unpersist(true)
         bucketDfs(bucketName).set(bucketDf)
+        bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
       }
     }
 
@@ -56,9 +58,11 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
   }
 }
 
-object MetadataQueryExecutor {
+object MetadataQueryExecutor extends LazyLogging {
 
   def setupDf(spark : SparkSession, config : CluesoConfig, bucketName : String) = {
+    logger.info(s"Calculating DFs for bucket $bucketName")
+
     val cols = Array(col("bucket"),
       col("kafkaTimestamp"),
       col("key"),
@@ -143,9 +147,10 @@ object MetadataQueryExecutor {
         col("message.`isDeleteMarker`").as("isDeleteMarker"),
         col("message.`x-amz-version-id`").as("x-amz-version-id"))
 
-    if (config.cacheDataframes)
+    if (config.cacheDataframes) {
+      logger.info(s"Caching dataframe for bucket ${bucketName}")
       result.cache()
-    else
+    } else
       result
   }
 

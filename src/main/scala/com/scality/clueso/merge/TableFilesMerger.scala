@@ -6,15 +6,17 @@ import java.util.{Date, UUID}
 import com.scality.clueso.SparkUtils.parquetFilesFilter
 import com.scality.clueso.{CluesoConfig, CluesoConstants, SparkUtils}
 import com.typesafe.config.ConfigFactory
+import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{col, dense_rank}
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 
-class TableFilesMerger(spark : SparkSession, config: CluesoConfig) {
+class TableFilesMerger(spark : SparkSession, config: CluesoConfig) extends LazyLogging{
 
   val fs = SparkUtils.buildHadoopFs(config)
 
+  val dateFormat = new java.text.SimpleDateFormat("yyyyMMdd_hhmmss")
 
   case class MergeInstructions(numPartitions : Int)
 
@@ -75,6 +77,7 @@ class TableFilesMerger(spark : SparkSession, config: CluesoConfig) {
   }
 
   def replaceStagingWithMerged(stagingPartitionPath: String, outputPath: String) = {
+    logger.info("Replace Staging Files With Merged")
     // list all files in staging
     val stagingParquetFiles = fs.listStatus(new Path(stagingPartitionPath), parquetFilesFilter)
 
@@ -91,14 +94,25 @@ class TableFilesMerger(spark : SparkSession, config: CluesoConfig) {
     val landedParquetFiles = fs.listStatus(new Path(landingPartitionPath), parquetFilesFilter)
     val mergedLandingFiles = landedParquetFiles.filter(lf => lf.getModificationTime < startTs - config.landingPurgeTolerance.toMillis)
 
+    logger.info("Removing processed files from Landing:\n  %s", mergedLandingFiles.map(_.getPath.getName).mkString("\n  "))
+
     mergedLandingFiles.foreach(lf => fs.delete(lf.getPath, false))
+  }
+
+  def deleteMetadataDir(landingPartitionPath: String): Unit = {
+    logger.info("Ruthlessly deleting metadata dir")
+
+    val dirPath = new Path(landingPartitionPath, "_spark_metadata")
+    if (fs.exists(dirPath)) {
+      fs.delete(dirPath, true)
+    }
   }
 
   def mergePartition(partitionColumnName : String, partitionValue : String, numPartitions : Int) = {
     println(s"Merging partition $partitionColumnName=$partitionValue into $numPartitions files")
 
-    val mergeOutputId = UUID.randomUUID()
-    val mergePath = s"${config.mergePath}/$mergeOutputId"
+    val mergeOutputId =  UUID.randomUUID().toString.replaceAll("-","").substring(0, 5)
+    val mergePath = s"${config.mergePath}/${dateFormat.format(new java.util.Date())}_$mergeOutputId"
     val outputPath = s"$mergePath/merged_data"
 
     val lockFilePath = lockPath(mergePath)
@@ -115,6 +129,10 @@ class TableFilesMerger(spark : SparkSession, config: CluesoConfig) {
         writeMergedData(mergedData.coalesce(numPartitions), outputPath)
 
         replaceStagingWithMerged(stagingPartitionPath, outputPath)
+
+        deleteMetadataDir(landingPartitionPath)
+
+        // TODO wait a bit before removing..
 
         removeProcessedFromLanding(landingPartitionPath, startTs)
       } catch {
