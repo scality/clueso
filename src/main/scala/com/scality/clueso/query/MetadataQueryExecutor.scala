@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 import com.scality.clueso.{CluesoConfig, CluesoConstants, SparkUtils}
 import com.typesafe.scalalogging.LazyLogging
+import org.apache.spark.SparkContext
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{col, _}
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -60,15 +61,27 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
 object MetadataQueryExecutor extends LazyLogging {
 
+  /** Method that just returns the current active/registered executors
+    * excluding the driver.
+    * @param sc The spark context to retrieve registered executors.
+    * @return a list of executors each in the form of host:port.
+    */
+  def currentActiveExecutors(sc: SparkContext): Seq[String] = {
+    val allExecutors = sc.getExecutorMemoryStatus.map(_._1)
+    val driverHost: String = sc.getConf.get("spark.driver.host")
+    allExecutors.filter(! _.split(":")(0).equals(driverHost)).toList
+  }
+
   def setupDf(spark : SparkSession, config : CluesoConfig, bucketName : String) = {
-    logger.info(s"Calculating DFs for bucket $bucketName")
+    val currentWorkers = currentActiveExecutors(spark.sparkContext).count(_ => true)
+
+    logger.info(s"Calculating DFs for bucket $bucketName – current workers = $currentWorkers")
 
     val cols = Array(col("bucket"),
       col("kafkaTimestamp"),
       col("key"),
       col("type"),
       col("message"))
-
 
     val _stagingTable = spark.read
       .schema(CluesoConstants.storedEventSchema)
@@ -78,11 +91,14 @@ object MetadataQueryExecutor extends LazyLogging {
     spark.catalog.refreshTable("staging")
 
     // read df
-    val stagingTable = spark.table("staging")
+    var stagingTable = spark.table("staging")
       .where(col("bucket").eqNullSafe(bucketName))
       .select(cols: _*)
-      .orderBy("key")
+//      .orderBy("key")
 
+    if (currentWorkers > 0) {
+      stagingTable = stagingTable.repartition(currentWorkers)
+    }
 
     val _landingTable = spark.read
       .schema(CluesoConstants.storedEventSchema)
@@ -90,10 +106,14 @@ object MetadataQueryExecutor extends LazyLogging {
       .createOrReplaceTempView("landing")
 
 
-    val landingTable = spark.table("landing")
+    var landingTable = spark.table("landing")
       .where(col("bucket").eqNullSafe(bucketName))
       .select(cols: _*)
-      .orderBy("key")
+//      .orderBy("key")
+
+    if (currentWorkers > 0) {
+      landingTable = landingTable.repartition(currentWorkers)
+    }
 
     //    // debug code
     //    println("staging schema:")
