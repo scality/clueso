@@ -67,13 +67,14 @@ object SparkUtils {
   def getQueryResults(spark : SparkSession, queryExecutor: MetadataQueryExecutor, query : MetadataQuery) = {
     val result = queryExecutor.execute(query)
 
-    val resultArray = try
-      if (result.count() > 0) {
-        result.toJSON.collect.map(_.replaceAll("`",""))
+    val resultArray = try {
+      val jsonResults = result.toJSON.collect()
+      if (jsonResults.size > 0) {
+        jsonResults.map(_.replaceAll("`",""))
       } else {
         Array[String]()
       }
-    catch {
+    } catch {
       case e:IOException => {
         println(e)
         Array[String]()
