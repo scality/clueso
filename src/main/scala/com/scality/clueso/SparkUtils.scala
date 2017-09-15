@@ -95,4 +95,14 @@ object SparkUtils {
     })
   }
 
+  def getParquetFilesStats(fs: FileSystem, path : String) = {
+    val statusList = fs.listStatus(new Path(path), new PathFilter {
+      override def accept(path: Path): Boolean = path.getName.endsWith(".parquet")
+    })
+
+    val fileCount = statusList.count(_ => true)
+    val avgFileSize = statusList.map(_.getLen).sum / fileCount
+
+    (fileCount, avgFileSize)
+  }
 }

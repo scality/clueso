@@ -72,17 +72,14 @@ object MetadataQueryExecutor extends LazyLogging {
     allExecutors.filter(! _.split(":")(0).equals(driverHost)).toList
   }
 
-  def setupDf(spark : SparkSession, config : CluesoConfig, bucketName : String) = {
-    val currentWorkers = currentActiveExecutors(spark.sparkContext).count(_ => true)
+  // columns in Parquet files (landing and staging)
+  val cols = Array(col("bucket"),
+    col("kafkaTimestamp"),
+    col("key"),
+    col("type"),
+    col("message"))
 
-    logger.info(s"Calculating DFs for bucket $bucketName – current workers = $currentWorkers")
-
-    val cols = Array(col("bucket"),
-      col("kafkaTimestamp"),
-      col("key"),
-      col("type"),
-      col("message"))
-
+  def getColdStagingTable(spark : SparkSession, config : CluesoConfig, bucketName : String) = {
     val _stagingTable = spark.read
       .schema(CluesoConstants.storedEventSchema)
       .parquet(config.stagingPath)
@@ -91,15 +88,15 @@ object MetadataQueryExecutor extends LazyLogging {
     spark.catalog.refreshTable("staging")
 
     // read df
-    var stagingTable = spark.table("staging")
+    val stagingTable = spark.table("staging")
       .where(col("bucket").eqNullSafe(bucketName))
       .select(cols: _*)
-//      .orderBy("key")
+    //      .orderBy("key")
 
-    if (currentWorkers > 0) {
-      stagingTable = stagingTable.repartition(currentWorkers)
-    }
+    stagingTable
+  }
 
+  def getColdLandingTable(spark : SparkSession, config : CluesoConfig, bucketName : String) = {
     val _landingTable = spark.read
       .schema(CluesoConstants.storedEventSchema)
       .parquet(config.landingPath)
@@ -109,7 +106,23 @@ object MetadataQueryExecutor extends LazyLogging {
     var landingTable = spark.table("landing")
       .where(col("bucket").eqNullSafe(bucketName))
       .select(cols: _*)
-//      .orderBy("key")
+    //      .orderBy("key")
+    landingTable
+  }
+
+  def setupDf(spark : SparkSession, config : CluesoConfig, bucketName : String) = {
+    val currentWorkers = currentActiveExecutors(spark.sparkContext).count(_ => true)
+
+    logger.info(s"Calculating DFs for bucket $bucketName – current workers = $currentWorkers")
+
+    // read df
+    var stagingTable = getColdStagingTable(spark, config, bucketName)
+
+    if (currentWorkers > 0) {
+      stagingTable = stagingTable.repartition(currentWorkers)
+    }
+
+    var landingTable = getColdLandingTable(spark, config, bucketName)
 
     if (currentWorkers > 0) {
       landingTable = landingTable.repartition(currentWorkers)
@@ -169,7 +182,9 @@ object MetadataQueryExecutor extends LazyLogging {
 
     if (config.cacheDataframes) {
       logger.info(s"Caching dataframe for bucket ${bucketName}")
-      result.cache()
+      result.createTempView(s"`bucket=$bucketName`")
+      result.sparkSession.catalog.cacheTable(s"`bucket=$bucketName`")
+      result
     } else
       result
   }

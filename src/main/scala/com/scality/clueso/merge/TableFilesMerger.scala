@@ -4,6 +4,7 @@ import java.io.File
 import java.util.{Date, UUID}
 
 import com.scality.clueso.SparkUtils.parquetFilesFilter
+import com.scality.clueso.query.MetadataQueryExecutor
 import com.scality.clueso.{CluesoConfig, CluesoConstants, SparkUtils}
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.LazyLogging
@@ -20,18 +21,36 @@ class TableFilesMerger(spark : SparkSession, config: CluesoConfig) extends LazyL
 
   case class MergeInstructions(numPartitions : Int)
 
-  def checkMergeEligibility(getPath: Path): Option[MergeInstructions] = {
-    // number of records criteria
-    val numberOfFiles = fs.listStatus(getPath, parquetFilesFilter).length
+  def checkMergeEligibility(bucketName : String): Option[MergeInstructions] = {
+    val landing_path = s"${config.landingPath}/bucket=$bucketName"
+    val staging_path = s"${config.stagingPath}/bucket=$bucketName"
 
-    if (numberOfFiles >= config.mergeMinFiles) {
-      val data = spark.read
-          .parquet(getPath.toUri.toString)
+    val (landingFileCount, landingAvgFileSize) = SparkUtils.getParquetFilesStats(fs, landing_path)
+    val (stagingFileCount, stagingAvgFileSize) = SparkUtils.getParquetFilesStats(fs, staging_path)
 
-      val numRecords = data.count
-      val numFinalFiles = Math.floor(numRecords / config.mergeFactor).toInt + 1
+    logger.info(s"Number of files in $landing_path: $landingFileCount")
+    logger.info(s"Avg File Size (MB) in $landing_path: ${landingAvgFileSize/1024/1024}")
 
-      if (numFinalFiles < numberOfFiles) {
+    logger.info(s"Number of files in $staging_path: $stagingFileCount")
+    logger.info(s"Avg File Size (MB) in $staging_path: ${stagingAvgFileSize/1024/1024}")
+
+
+    logger.info(s"Number of merge min files (configuration) : ${config.mergeMinFiles}")
+
+    if (landingFileCount >= config.mergeMinFiles) {
+
+      val landingRecordCount = MetadataQueryExecutor.getColdLandingTable(spark, config, bucketName).count()
+      val stagingRecordCount = MetadataQueryExecutor.getColdStagingTable(spark, config, bucketName).count()
+
+      logger.info(s"Merge Factor = ${config.mergeFactor}")
+      var numFinalFiles = Math.floor((landingRecordCount + stagingRecordCount) / config.mergeFactor).toInt + 1
+      numFinalFiles += numFinalFiles % 8
+
+      logger.info(s"Number of records in landing = $landingRecordCount")
+      logger.info(s"Number of records in staging = $stagingRecordCount")
+      logger.info(s"Calculated number of final files in staging: $numFinalFiles")
+
+      if (numFinalFiles < (landingFileCount)) {
         return Some(MergeInstructions(numFinalFiles))
       }
     }
@@ -52,20 +71,19 @@ class TableFilesMerger(spark : SparkSession, config: CluesoConfig) extends LazyL
       if (fileStatus.isDirectory &&
         fileStatus.getPath.getName.matches(partDirnamePattern.pattern.pattern())) {
 
-        checkMergeEligibility(fileStatus.getPath) match {
-          case Some(MergeInstructions(numPartitions)) => {
-            val regexMatch = partDirnamePattern.findFirstMatchIn(fileStatus.getPath.getName)
+        val regexMatch = partDirnamePattern.findFirstMatchIn(fileStatus.getPath.getName)
 
-            regexMatch.map { rm =>
+
+        regexMatch.map { rm =>
+          checkMergeEligibility(rm.group(2)) match {
+            case Some(MergeInstructions(numPartitions)) => {
               mergePartition(partitionColumnName = rm.group(1),
                 partitionValue = rm.group(2),
                 numPartitions)
             }
+            case _ =>
           }
-          case _ =>
         }
-
-
       }
     }
   }
