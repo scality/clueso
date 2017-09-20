@@ -101,7 +101,7 @@ object SparkUtils {
     })
 
     val fileCount = statusList.count(_ => true)
-    val avgFileSize = statusList.map(_.getLen).sum / fileCount
+    val avgFileSize = statusList.map(_.getLen).sum / Math.max(fileCount, 1)
 
     (fileCount, avgFileSize)
   }

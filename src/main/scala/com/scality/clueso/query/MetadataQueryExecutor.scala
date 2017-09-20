@@ -5,43 +5,175 @@ import java.util.concurrent.atomic.AtomicReference
 import com.scality.clueso.{CluesoConfig, CluesoConstants, SparkUtils}
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.spark.SparkContext
+import org.apache.spark.clueso.metrics.SearchMetricsSource
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{col, _}
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 import org.joda.time.DateTime
+
+import scala.concurrent.{Await, Future}
 
 
 class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends LazyLogging {
   import MetadataQueryExecutor._
 
-  var bucketDfs = Map[String, AtomicReference[DataFrame]]()
-  var bucketUpdateTs = Map[String, DateTime]()
+//  val metricRegistryThread = new Thread {
+//    lazy val metricsSource = SearchMetricsSource(spark, prefix = "search")
+//
+//    while (true) {
+//      Thread.sleep(5000)
+//
+//
+//      // register source for cached dataframe
+//      // TODO sampling? only update every N times?
+//      //      updateCounters()
+//      logger.info("Registrying new metrics")
+//      metricsSource.registerRddMetrics()
+//      logger.info("Done")
+//    }
+//  }
+
+  SearchMetricsSource(spark, config)
+
+  import scala.concurrent.ExecutionContext.Implicits.global
+  Future {
+    while (true) {
+      Thread.sleep(5000)
+
+      // register source for cached dataframe
+      // TODO sampling? only update every N times?
+      //      updateCounters()
+      logger.info("Registrying new metrics")
+//      metricsSource.registerRddMetrics()
+
+      SearchMetricsSource.registerRddMetrics(spark)
+
+      logger.info("Done")
+    }
+  }
+
+
+  //  if (config.cacheDataframes) {
+//    metricRegistryThread.start()
+//    logger.info("Metric Registry Thread running")
+//  }
+
+
+
+
+//  // bucket name -> counts
+//  lazy val counters = mutable.Map[String, SparkGauge]()
+//
+//  def counterFor(bucketName : String, measurementName : String) = {
+//    logger.info(s"Retriving metrics counter for $bucketName measurement $measurementName")
+//    counters.getOrElseUpdate(bucketName, {
+//      UserMetricsSystem.gauge(s"$bucketName.$measurementName")
+//    })
+//  }
+
+//  def updateCounters() = {
+//    val hint = "bucket="
+//    spark.sparkContext.getRDDStorageInfo.filter { rddInfo =>
+//      logger.info(s"Filtering rddInfo Name = ${rddInfo.name}")
+//      rddInfo.name.indexOf(hint) >= 0
+//    } map { rddInfo =>
+//      val name = rddInfo.name.substring(rddInfo.name.indexOf(hint) + hint.length, rddInfo.name.length - 1)
+//
+//      logger.info(s"Transforming rddInfo Name = ${rddInfo.name} into $name ")
+//
+//      (name, rddInfo)
+//    } foreach { case (name, rddInfo) =>
+////      counterFor(name, "numPartitions").set(rddInfo.numPartitions)
+////      counterFor(name, "numCachedPartitions").set(rddInfo.numCachedPartitions)
+////      counterFor(name, "memSize").set(rddInfo.memSize)
+////      counterFor(name, "diskSize").set(rddInfo.diskSize)
+////      counterFor(name, "externalBlockStoreSize").set(rddInfo.externalBlockStoreSize)
+//
+//        metricsSource.registerRddMetric(name, "numPartitions", _.numPartitions)
+//        metricsSource.registerRddMetric(name, "numCachedPartitions", _.numCachedPartitions)
+//        metricsSource.registerRddMetric(name, "memSize", _.memSize)
+//        metricsSource.registerRddMetric(name, "diskSize", _.diskSize)
+//        metricsSource.registerRddMetric(name, "externalBlockStoreSize", _.externalBlockStoreSize)
+//
+//
+//    }
+//
+//    metricsSource.registerRddMetrics()
+//  }
 
   def executeAndPrint(query : MetadataQuery) = {
     SparkUtils.getQueryResults(spark, this, query)
   }
 
+  var bucketDfs = Map[String, AtomicReference[DataFrame]]()
+  var bucketUpdateTs = Map[String, DateTime]()
+
+  def getBucketDataframe(bucketName : String) : DataFrame = {
+    if (!config.cacheDataframes) {
+      setupDf(spark, config, bucketName)
+    } else {
+      // check if cache doesn't exist
+      val tableView = s"${(Math.random()*100).toInt}_$bucketName"
+      if (!bucketDfs.contains(bucketName)) {
+        val bucketDf = setupDf(spark, config, bucketName)
+
+
+        bucketDf.createOrReplaceTempView(tableView)
+        bucketDf.sparkSession.catalog.cacheTable(tableView)
+
+        bucketDfs = bucketDfs.updated(bucketName, new AtomicReference(bucketDf))
+        bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
+
+        bucketDf
+      } else {
+        // cache exists
+
+        if (bucketUpdateTs(bucketName).plus(config.mergeFrequency.toMillis).isBeforeNow) {
+          // async update dataframe:
+          val f = Future {
+            logger.info(s"Calculating view $tableView")
+            val bucketDf = setupDf(spark, config, bucketName)
+
+            bucketDf.createOrReplaceTempView(tableView)
+
+            // this operation triggers execution
+            val cachingAsync = Future {
+              bucketDf.sparkSession.catalog.cacheTable(tableView)
+            }
+            import scala.concurrent.duration._
+            Await.ready(cachingAsync, 3 minutes)
+
+            bucketDf
+          } map { bucketDf =>
+            logger.info(s"Calculating view $tableView")
+            bucketDf.count() // force calculation
+            logger.info(s"Atomically swapping RDD for bucket = $bucketName ( new = $tableView )")
+            val oldDf = bucketDfs.getOrElse(bucketName, new AtomicReference()).getAndSet(bucketDf)
+            bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
+
+            // sleep before deleting oldDf
+            Thread.sleep(10000) // TODO make configurable
+            logger.info(s"Unpersisting ${oldDf.rdd.name} after 10sec")
+            oldDf.unpersist(true)
+          }
+
+          // set the time as updated, to avoid triggering it again
+          bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
+        }
+
+        //  return most recent cached version (always)
+        bucketDfs(bucketName).get()
+      }
+    }
+  }
+
+
   def execute(query : MetadataQuery) = {
     val bucketName = query.bucketName
 
-    if (!config.cacheDataframes || !bucketDfs.contains(bucketName)) {
-      val bucketDf = setupDf(spark, config, bucketName)
-      bucketDfs = bucketDfs.updated(bucketName, new AtomicReference(bucketDf))
-      bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
-    } else {
-      // check if the dataframe is 'old' and update
-      if (bucketUpdateTs(bucketName).plus(config.mergeFrequency.toMillis).isBeforeNow) {
-        // update dataframe
-        logger.info("Recycling dataframe")
-        val bucketDf = setupDf(spark, config, bucketName)
+    SearchMetricsSource.countSearches(1)
 
-        bucketDfs(bucketName).get().unpersist(true)
-        bucketDfs(bucketName).set(bucketDf)
-        bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
-      }
-    }
-
-    var resultDf = bucketDfs(bucketName).get()
+    var resultDf = getBucketDataframe(bucketName)
 
     val sqlWhereExpr = query.sqlWhereExpr
     if (!sqlWhereExpr.isEmpty) {
@@ -51,6 +183,8 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
     if (query.start_key.isDefined) {
       resultDf = resultDf.where(col("key") > lit(query.start_key.get))
     }
+
+    val currentWorkers = Math.max(currentActiveExecutors(spark.sparkContext).count(_ => true), 1)
 
     resultDf
       .select(CluesoConstants.resultCols: _*)
@@ -110,7 +244,8 @@ object MetadataQueryExecutor extends LazyLogging {
     landingTable
   }
 
-  def setupDf(spark : SparkSession, config : CluesoConfig, bucketName : String) = {
+  // returns data frame together with wasCached boolean
+  def setupDf(spark : SparkSession, config : CluesoConfig, bucketName : String) : Dataset[Row]= {
     val currentWorkers = currentActiveExecutors(spark.sparkContext).count(_ => true)
 
     logger.info(s"Calculating DFs for bucket $bucketName – current workers = $currentWorkers")
@@ -148,7 +283,7 @@ object MetadataQueryExecutor extends LazyLogging {
     import SparkUtils.fillNonExistingColumns
 
 
-    val result = landingTable.select(fillNonExistingColumns(colsLanding, unionCols):_*)
+    var result = landingTable.select(fillNonExistingColumns(colsLanding, unionCols):_*)
       .union(stagingTable.select(fillNonExistingColumns(colsStaging, unionCols):_*))
       .orderBy(col("key"))
       .withColumn("rank", dense_rank().over(windowSpec))
@@ -180,16 +315,16 @@ object MetadataQueryExecutor extends LazyLogging {
         col("message.`isDeleteMarker`").as("isDeleteMarker"),
         col("message.`x-amz-version-id`").as("x-amz-version-id"))
 
-    if (config.cacheDataframes) {
-      logger.info(s"Caching dataframe for bucket ${bucketName}")
-      result.createTempView(s"`bucket=$bucketName`")
-      result.sparkSession.catalog.cacheTable(s"`bucket=$bucketName`")
-      result
-    } else
-      result
+    if (currentWorkers > 0) {
+      result = result.coalesce(currentWorkers)
+    }
+
+    result
   }
 
-  def apply(spark: SparkSession, config: CluesoConfig): MetadataQueryExecutor = new MetadataQueryExecutor(spark, config)
+  def apply(spark: SparkSession, config: CluesoConfig): MetadataQueryExecutor = {
+    new MetadataQueryExecutor(spark, config)
+  }
 
   def main(args: Array[String]): Unit = {
     require(args.length > 2, "Usage: ./command /path/to/application.conf bucket sqlWhereQuery")

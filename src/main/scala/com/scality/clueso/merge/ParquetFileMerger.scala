@@ -21,7 +21,6 @@ object ParquetFileMerger {
       .write
       .partitionBy("bucket")
       .parquet(outputPath)
-
   }
 
 }

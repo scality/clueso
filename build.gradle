@@ -52,6 +52,8 @@ dependencies {
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: '2.6.5'
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.6.5'
 
+    // required for the Metrics System
+    compile group: 'org.eclipse.jetty', name: 'jetty-server', version: '9.3.20.v20170531'
 
     compile 'org.apache.spark:spark-sql-kafka-0-10_'+scalaVersion+':' + sparkVersion
 
@@ -68,6 +70,7 @@ dependencies {
 
     // tools command line opt parsing
     compile group: 'org.rogach', name: 'scallop_2.11', version: '3.1.0'
+
 
     testCompile 'org.apache.spark:spark-sql_'+scalaVersion+':' + sparkVersion
     testCompile 'org.apache.spark:spark-streaming_'+scalaVersion+':' + sparkVersion
@@ -114,7 +117,7 @@ task toolShadowJar(type: com.github.jengelman.gradle.plugins.shadow.tasks.Shadow
     configurations = [project.configurations.runtime, project.configurations.shadow]
 
     exclude('META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA')
-
+    exclude('metrics.properties')
 
     zip64 true
 

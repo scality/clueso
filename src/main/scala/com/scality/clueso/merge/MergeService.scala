@@ -51,7 +51,7 @@ class MergeService(spark : SparkSession, config : CluesoConfig) {
     .withIdentity("MergeParquetFilesJob", "Jobs")
     .build
 
-  quartz.start
+  quartz.start()
   quartz.scheduleJob(job, trigger)
 
   println("Merge service running")

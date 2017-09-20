@@ -29,10 +29,10 @@ class TableFilesMerger(spark : SparkSession, config: CluesoConfig) extends LazyL
     val (stagingFileCount, stagingAvgFileSize) = SparkUtils.getParquetFilesStats(fs, staging_path)
 
     logger.info(s"Number of files in $landing_path: $landingFileCount")
-    logger.info(s"Avg File Size (MB) in $landing_path: ${landingAvgFileSize/1024/1024}")
+    logger.info(s"Avg File Size (MB) in $landing_path: ${landingAvgFileSize/1024.0/1024.0}")
 
     logger.info(s"Number of files in $staging_path: $stagingFileCount")
-    logger.info(s"Avg File Size (MB) in $staging_path: ${stagingAvgFileSize/1024/1024}")
+    logger.info(s"Avg File Size (MB) in $staging_path: ${stagingAvgFileSize/1024.0/1024.0}")
 
 
     logger.info(s"Number of merge min files (configuration) : ${config.mergeMinFiles}")
@@ -117,10 +117,10 @@ class TableFilesMerger(spark : SparkSession, config: CluesoConfig) extends LazyL
     mergedLandingFiles.foreach(lf => fs.delete(lf.getPath, false))
   }
 
-  def deleteMetadataDir(landingPartitionPath: String): Unit = {
-    logger.info("Ruthlessly deleting metadata dir")
+  def deleteMetadataDir(path: String): Unit = {
+    logger.info(s"Ruthlessly deleting metadata dir on $path")
 
-    val dirPath = new Path(landingPartitionPath, "_spark_metadata")
+    val dirPath = new Path(path, "_spark_metadata")
     if (fs.exists(dirPath)) {
       fs.delete(dirPath, true)
     }
@@ -148,7 +148,7 @@ class TableFilesMerger(spark : SparkSession, config: CluesoConfig) extends LazyL
 
         replaceStagingWithMerged(stagingPartitionPath, outputPath)
 
-        deleteMetadataDir(landingPartitionPath)
+        deleteMetadataDir(config.landingPath)
 
         // TODO wait a bit before removing..
 

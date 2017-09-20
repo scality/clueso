@@ -36,6 +36,9 @@ class CluesoConfig(config: Config) {
 
   val cacheDataframes = config.hasPath("cache_dataframes") && config.getBoolean("cache_dataframes")
 
+  val graphiteHost = config.getString("graphite.hostname")
+  val graphitePort = config.getInt("graphite.port")
+
   import scala.collection.JavaConversions._
   override def toString: String = config.entrySet().map { entry =>
       s"  ${entry.getKey} = ${entry.getValue.toString}"
