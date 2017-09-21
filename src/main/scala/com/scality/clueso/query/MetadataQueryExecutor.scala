@@ -52,8 +52,6 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
   }
 
-  printResults(kpn, scala.concurrent.duration.Duration.apply(200, java.util.concurrent.TimeUnit.MILLISECONDS))
-
   def execAsync(query : MetadataQuery) = {
     Future {
       SparkUtils.getQueryResults(spark, this, query)
