@@ -33,6 +33,11 @@ object SearchMetricsSource extends LazyLogging {
 class SearchMetricsSource(sparkSession: SparkSession, config : CluesoConfig) extends Source
   with LazyLogging {
 
+  sys.addShutdownHook {
+    logger.info("Shutting down Search Metrics Source")
+    graphite.foreach(_.close())
+  }
+
   val _metricRegistry: MetricRegistry = new MetricRegistry()
 
   val graphite = if (config.graphiteHost.isEmpty)

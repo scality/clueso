@@ -1,6 +1,8 @@
 package com.scality.clueso.query
 
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
+import java.util.{concurrent => juc}
 
 import com.scality.clueso.{CluesoConfig, CluesoConstants, SparkUtils}
 import com.typesafe.scalalogging.LazyLogging
@@ -11,102 +13,73 @@ import org.apache.spark.sql.functions.{col, _}
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 import org.joda.time.DateTime
 
-import scala.concurrent.{Await, Future}
-
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
 
 class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends LazyLogging {
   import MetadataQueryExecutor._
 
-//  val metricRegistryThread = new Thread {
-//    lazy val metricsSource = SearchMetricsSource(spark, prefix = "search")
-//
-//    while (true) {
-//      Thread.sleep(5000)
-//
-//
-//      // register source for cached dataframe
-//      // TODO sampling? only update every N times?
-//      //      updateCounters()
-//      logger.info("Registrying new metrics")
-//      metricsSource.registerRddMetrics()
-//      logger.info("Done")
-//    }
-//  }
+  implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
 
   SearchMetricsSource(spark, config)
 
-  import scala.concurrent.ExecutionContext.Implicits.global
   Future {
     while (true) {
       Thread.sleep(5000)
 
-      // register source for cached dataframe
-      // TODO sampling? only update every N times?
-      //      updateCounters()
       logger.info("Registrying new metrics")
-//      metricsSource.registerRddMetrics()
-
       SearchMetricsSource.registerRddMetrics(spark)
-
       logger.info("Done")
     }
   }
 
+  def printResults(f : Future[Array[String]], duration: Duration) : Int = {
+    try {
+      val result = Await.result[Array[String]](f, duration)
+      println(s"RESULT:[${result.mkString(",")}]")
+      -1
+    } catch {
+      case t:TimeoutException => {
+        println("")
+        -1
+      }
+      case t:Throwable => {
+        logger.error("Error while printing results", t)
+        println(s"ERROR:${t.toString}")
+        -1
+      }
+    }
 
-  //  if (config.cacheDataframes) {
-//    metricRegistryThread.start()
-//    logger.info("Metric Registry Thread running")
-//  }
+  }
 
+  printResults(kpn, scala.concurrent.duration.Duration.apply(200, java.util.concurrent.TimeUnit.MILLISECONDS))
 
-
-
-//  // bucket name -> counts
-//  lazy val counters = mutable.Map[String, SparkGauge]()
-//
-//  def counterFor(bucketName : String, measurementName : String) = {
-//    logger.info(s"Retriving metrics counter for $bucketName measurement $measurementName")
-//    counters.getOrElseUpdate(bucketName, {
-//      UserMetricsSystem.gauge(s"$bucketName.$measurementName")
-//    })
-//  }
-
-//  def updateCounters() = {
-//    val hint = "bucket="
-//    spark.sparkContext.getRDDStorageInfo.filter { rddInfo =>
-//      logger.info(s"Filtering rddInfo Name = ${rddInfo.name}")
-//      rddInfo.name.indexOf(hint) >= 0
-//    } map { rddInfo =>
-//      val name = rddInfo.name.substring(rddInfo.name.indexOf(hint) + hint.length, rddInfo.name.length - 1)
-//
-//      logger.info(s"Transforming rddInfo Name = ${rddInfo.name} into $name ")
-//
-//      (name, rddInfo)
-//    } foreach { case (name, rddInfo) =>
-////      counterFor(name, "numPartitions").set(rddInfo.numPartitions)
-////      counterFor(name, "numCachedPartitions").set(rddInfo.numCachedPartitions)
-////      counterFor(name, "memSize").set(rddInfo.memSize)
-////      counterFor(name, "diskSize").set(rddInfo.diskSize)
-////      counterFor(name, "externalBlockStoreSize").set(rddInfo.externalBlockStoreSize)
-//
-//        metricsSource.registerRddMetric(name, "numPartitions", _.numPartitions)
-//        metricsSource.registerRddMetric(name, "numCachedPartitions", _.numCachedPartitions)
-//        metricsSource.registerRddMetric(name, "memSize", _.memSize)
-//        metricsSource.registerRddMetric(name, "diskSize", _.diskSize)
-//        metricsSource.registerRddMetric(name, "externalBlockStoreSize", _.externalBlockStoreSize)
-//
-//
-//    }
-//
-//    metricsSource.registerRddMetrics()
-//  }
+  def execAsync(query : MetadataQuery) = {
+    Future {
+      SparkUtils.getQueryResults(spark, this, query)
+    }
+  }
 
   def executeAndPrint(query : MetadataQuery) = {
-    SparkUtils.getQueryResults(spark, this, query)
+    val resultArray = SparkUtils.getQueryResults(spark, this, query)
+    println("[" +  resultArray.mkString(",") + "]")
   }
 
   var bucketDfs = Map[String, AtomicReference[DataFrame]]()
   var bucketUpdateTs = Map[String, DateTime]()
+
+
+  val setupDfLock = new scala.collection.parallel.mutable.ParHashSet[String]()
+
+  def acquireLock(bucketName : String) = synchronized {
+    if (!setupDfLock.contains(bucketName)) {
+      setupDfLock += bucketName
+      true
+    } else
+      false
+  }
+
+  def releaseLock(bucketName : String) = synchronized { setupDfLock -= bucketName }
 
   def getBucketDataframe(bucketName : String) : DataFrame = {
     if (!config.cacheDataframes) {
@@ -117,44 +90,50 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
       if (!bucketDfs.contains(bucketName)) {
         val bucketDf = setupDf(spark, config, bucketName)
 
+        if (acquireLock(bucketName)) {
+          bucketDf.createOrReplaceTempView(tableView)
+          bucketDf.sparkSession.catalog.cacheTable(tableView)
 
-        bucketDf.createOrReplaceTempView(tableView)
-        bucketDf.sparkSession.catalog.cacheTable(tableView)
-
-        bucketDfs = bucketDfs.updated(bucketName, new AtomicReference(bucketDf))
-        bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
+          bucketDfs = bucketDfs.updated(bucketName, new AtomicReference(bucketDf))
+          bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
+          releaseLock(bucketName)
+        }
 
         bucketDf
       } else {
         // cache exists
-
         if (bucketUpdateTs(bucketName).plus(config.mergeFrequency.toMillis).isBeforeNow) {
-          // async update dataframe:
-          val f = Future {
-            logger.info(s"Calculating view $tableView")
-            val bucketDf = setupDf(spark, config, bucketName)
+          // check if there's a dataframe update going on
+          if (acquireLock(bucketName)) {
 
-            bucketDf.createOrReplaceTempView(tableView)
+            // async update dataframe if there's none already doing it
+            Future {
+              logger.info(s"Calculating view $tableView")
+              val bucketDf = setupDf(spark, config, bucketName)
 
-            // this operation triggers execution
-            val cachingAsync = Future {
-              bucketDf.sparkSession.catalog.cacheTable(tableView)
+              bucketDf.createOrReplaceTempView(tableView)
+
+              // this operation triggers execution
+              val cachingAsync = Future {
+                bucketDf.sparkSession.catalog.cacheTable(tableView)
+              }
+              import scala.concurrent.duration._
+              Await.ready(cachingAsync, 3 minutes)
+
+              bucketDf
+            } map { bucketDf =>
+              logger.info(s"Calculating view $tableView")
+              bucketDf.count() // force calculation
+              logger.info(s"Atomically swapping RDD for bucket = $bucketName ( new = $tableView )")
+              val oldDf = bucketDfs.getOrElse(bucketName, new AtomicReference()).getAndSet(bucketDf)
+              bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
+              releaseLock(bucketName) // unlock
+
+              // sleep before deleting oldDf
+              Thread.sleep(10000) // TODO make configurable
+              logger.info(s"Unpersisting ${oldDf.rdd.name} after 10sec")
+              oldDf.unpersist(true)
             }
-            import scala.concurrent.duration._
-            Await.ready(cachingAsync, 3 minutes)
-
-            bucketDf
-          } map { bucketDf =>
-            logger.info(s"Calculating view $tableView")
-            bucketDf.count() // force calculation
-            logger.info(s"Atomically swapping RDD for bucket = $bucketName ( new = $tableView )")
-            val oldDf = bucketDfs.getOrElse(bucketName, new AtomicReference()).getAndSet(bucketDf)
-            bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
-
-            // sleep before deleting oldDf
-            Thread.sleep(10000) // TODO make configurable
-            logger.info(s"Unpersisting ${oldDf.rdd.name} after 10sec")
-            oldDf.unpersist(true)
           }
 
           // set the time as updated, to avoid triggering it again

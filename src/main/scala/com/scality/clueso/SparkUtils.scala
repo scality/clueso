@@ -81,8 +81,8 @@ object SparkUtils {
       }
     }
 
-    println("[" + resultArray.mkString(",") + "]")
-  }
+    resultArray}
+
 
   val parquetFilesFilter = new PathFilter {
     override def accept(path: Path): Boolean = path.getName.endsWith(".parquet")
@@ -104,5 +104,11 @@ object SparkUtils {
     val avgFileSize = statusList.map(_.getLen).sum / Math.max(fileCount, 1)
 
     (fileCount, avgFileSize)
+  }
+
+  private[clueso] def createSet[T]() = {
+    import scala.collection.JavaConverters._
+    java.util.Collections.newSetFromMap(
+      new java.util.concurrent.ConcurrentHashMap[T, java.lang.Boolean]).asScala
   }
 }
