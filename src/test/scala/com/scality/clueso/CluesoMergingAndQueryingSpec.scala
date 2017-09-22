@@ -90,7 +90,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
         // given we apply merge
         val merger = new TableFilesMerger(spark, config)
-        merger.merge()
+        merger.mergePartition("bucket", "wednesday", 1)
 
         // then, landing should be empty
         fs.listStatus(new Path(config.landingPath, "bucket=wednesday"),
@@ -152,7 +152,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
         // given we apply merge
         val merger = new TableFilesMerger(spark, config)
-        merger.merge()
+        merger.mergePartition("bucket", "wednesday", 1)
 
         // then, landing should be empty
         val fs = SparkUtils.buildHadoopFs(config)
@@ -233,7 +233,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
         // given we apply merge
         val merger = new TableFilesMerger(spark, config)
-        merger.merge()
+        merger.mergePartition("bucket", "wednesday", 1)
 
         // then, landing should be empty
         val fs = SparkUtils.buildHadoopFs(config)
@@ -247,6 +247,90 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
         maybeB = result.take(1).head
         maybeB.getString(maybeB.fieldIndex("key")) shouldEqual "fun"
+    }
+
+
+    "Scenario 5: queries with like '%' work" in withSparkContext {
+      (spark, config) =>
+
+        import spark.implicits._
+
+        val now = new java.util.Date().getTime
+
+        val landingData = Seq(
+          (new Timestamp(now + 2000), "{\"type\":\"put\",\"bucket\":\"wednesday\",\"key\":\"puppie-other\",\"value\":{\"md-model-version\":3,\"owner-display-name\":\"CustomAccount\",\"owner-id\":\"12349df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47qwer\",\"content-length\":200,\"content-type\":\"text/plain\",\"last-modified\":\"2017-08-08T03:43:33.115Z\",\"content-md5\":\"1772d41ea77fc34588c131b057ab1ec3-2\",\"x-amz-version-id\":\"null\",\"x-amz-server-version-id\":\"\",\"x-amz-storage-class\":\"STANDARD\",\"x-amz-server-side-encryption\":\"\",\"x-amz-server-side-encryption-aws-kms-key-id\":\"\",\"x-amz-server-side-encryption-customer-algorithm\":\"\",\"x-amz-website-redirect-location\":\"\",\"acl\":{\"Canned\":\"private\",\"FULL_CONTROL\":[],\"WRITE_ACP\":[],\"READ\":[],\"READ_ACP\":[]},\"key\":\"\",\"location\":[{\"key\":\"dcd2c7c3b34cb3975ab910e7fad6fe37dbd58654\",\"size\":5242880,\"start\":0,\"dataStoreName\":\"file\",\"dataStoreETag\":\"1:496fe4b97d716800d77cf36c4f51cb72\"},{\"key\":\"850bc9cfe29cf0886b73778917329787500de2bd\",\"size\":4586749,\"start\":5242880,\"dataStoreName\":\"file\",\"dataStoreETag\":\"2:d30650f389fe4e164f5a6a6e7d6565b7\"}],\"tags\":{\"param\":\"yes\",\"good\":\"night\"},\"replicationInfo\":{\"status\":\"\",\"content\":[],\"destination\":\"\",\"storageClass\":\"\",\"role\":\"\"},\"userMd\":{\"x-amz-meta-dog\":\"pitbull\",\"x-amz-meta-s3cmd-attrs\":\"uid:1000/gname:scality/uname:scality/gid:1000/mode:33188/mtime:1493944455/atime:1495560440/md5:a18d867021e391c071ce1337bdc24b7f/ctime:1493944455\"}}}"),
+          (new Timestamp(now + 1000), "{\"type\":\"put\",\"bucket\":\"wednesday\",\"key\":\"puppie-goldenret\",\"value\":{\"md-model-version\":3,\"owner-display-name\":\"CustomAccount\",\"owner-id\":\"12349df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47qwer\",\"content-length\":100,\"last-modified\":\"2017-08-08T03:57:02.249Z\",\"content-md5\":\"4b02d12ad7f063d67aec9dc2116a57a2\",\"x-amz-version-id\":\"null\",\"x-amz-server-version-id\":\"\",\"x-amz-storage-class\":\"STANDARD\",\"x-amz-server-side-encryption\":\"\",\"x-amz-server-side-encryption-aws-kms-key-id\":\"\",\"x-amz-server-side-encryption-customer-algorithm\":\"\",\"x-amz-website-redirect-location\":\"\",\"acl\":{\"Canned\":\"private\",\"FULL_CONTROL\":[],\"WRITE_ACP\":[],\"READ\":[],\"READ_ACP\":[]},\"key\":\"\",\"location\":[{\"key\":\"12cb0b112d663e73effb32c58fe3fab9f4bd002c\",\"size\":13,\"start\":0,\"dataStoreName\":\"file\",\"dataStoreETag\":\"1:4b02d12ad7f063d67aec9dc2116a57a2\"}],\"isDeleteMarker\":false,\"tags\":{\"param\":\"yes\"},\"replicationInfo\":{\"status\":\"\",\"content\":[],\"destination\":\"\",\"storageClass\":\"\",\"role\":\"\"},\"dataStoreName\":\"us-east-1\",\"userMd\":{\"x-amz-meta-verymeta\":\"2\",\"x-amz-meta-color\":\"blue\",\"x-amz-meta-more\":\"morefun\",\"x-amz-meta-words\":\"runningout\",\"x-amz-meta-evenmore\":\"evenmorefun\",\"x-amz-meta-dog\":\"golden-retriever\",\"x-amz-meta-mymeta1\":\"thisisfun\",\"x-amz-meta-mymeta2\":\"thisisfun2\"}}}")
+        )
+
+        val stagingData = Seq(
+          (new Timestamp(now), "{\"type\":\"put\",\"bucket\":\"wednesday\",\"key\":\"puppie-labrador\",\"value\":{\"md-model-version\":3,\"owner-display-name\":\"CustomAccount\",\"owner-id\":\"12349df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47qwer\",\"content-length\":13,\"last-modified\":\"2017-08-08T03:57:02.249Z\",\"content-md5\":\"4b02d12ad7f063d67aec9dc2116a57a2\",\"x-amz-version-id\":\"null\",\"x-amz-server-version-id\":\"\",\"x-amz-storage-class\":\"STANDARD\",\"x-amz-server-side-encryption\":\"\",\"x-amz-server-side-encryption-aws-kms-key-id\":\"\",\"x-amz-server-side-encryption-customer-algorithm\":\"\",\"x-amz-website-redirect-location\":\"\",\"acl\":{\"Canned\":\"private\",\"FULL_CONTROL\":[],\"WRITE_ACP\":[],\"READ\":[],\"READ_ACP\":[]},\"key\":\"\",\"location\":[{\"key\":\"12cb0b112d663e73effb32c58fe3fab9f4bd002c\",\"size\":13,\"start\":0,\"dataStoreName\":\"file\",\"dataStoreETag\":\"1:4b02d12ad7f063d67aec9dc2116a57a2\"}],\"isDeleteMarker\":false,\"tags\":{},\"replicationInfo\":{\"status\":\"\",\"content\":[],\"destination\":\"\",\"storageClass\":\"\",\"role\":\"\"},\"dataStoreName\":\"us-east-1\",\"userMd\":{\"x-amz-meta-verymeta\":\"2\",\"x-amz-meta-color\":\"red\",\"x-amz-meta-more\":\"morefun\",\"x-amz-meta-words\":\"runningout\",\"x-amz-meta-evenmore\":\"evenmorefun\",\"x-amz-meta-dog\":\"labrador-retriever\",\"x-amz-meta-mymeta1\":\"thisisfun\",\"x-amz-meta-mymeta2\":\"thisisfun2\"}}}")
+        )
+
+        // when we have Staging with putA , Landing with delA, putB
+        val stagingDf = stagingData.toDF("timestamp", "value")
+        var stream = MetadataIngestionPipeline.filterAndParseEvents(config.bucketName, stagingDf)
+        stream.write
+          .partitionBy("bucket")
+          .mode(SaveMode.Overwrite)
+          .parquet(config.stagingPath)
+
+        val landingDf = landingData.toDF("timestamp", "value")
+        stream = MetadataIngestionPipeline.filterAndParseEvents(config.bucketName, landingDf)
+        stream.write
+          .partitionBy("bucket")
+          .mode(SaveMode.Overwrite)
+          .parquet(config.landingPath)
+
+        // TODO cache?
+        val queryExecutor = MetadataQueryExecutor(spark, config)
+
+
+        val queryWhereStmt = """ userMd.`x-amz-meta-dog` LIKE "%retriever" """
+        // given
+        val query = new MetadataQuery("wednesday", queryWhereStmt, None, 100)
+        val page1Query = new MetadataQuery("wednesday", queryWhereStmt, None, 1)
+        var result = queryExecutor.execute(page1Query)
+
+        // then
+        result.count() shouldBe 1
+
+        var results = result.collect()
+
+        var maybeB = result.take(1).head
+        var resultItemKey = maybeB.getString(maybeB.fieldIndex("key"))
+        resultItemKey shouldEqual "puppie-goldenret"
+
+
+        val page2Query = new MetadataQuery("wednesday", queryWhereStmt, Some(resultItemKey), 1)
+        result = queryExecutor.execute(page2Query)
+
+        // then
+        result.count() shouldBe 1
+
+        maybeB = result.take(1).head
+        resultItemKey = maybeB.getString(maybeB.fieldIndex("key"))
+        resultItemKey shouldEqual "puppie-labrador"
+
+        val page3Query = new MetadataQuery("wednesday", queryWhereStmt, Some(resultItemKey), 1)
+        result = queryExecutor.execute(page3Query)
+
+        // then
+        result.count() shouldBe 0
+
+
+        // given we apply merge
+        val merger = new TableFilesMerger(spark, config)
+        merger.mergePartition("bucket", "wednesday", 1)
+
+        // then, landing should be empty
+        val fs = SparkUtils.buildHadoopFs(config)
+        fs.listStatus(new Path(config.landingPath, "bucket=wednesday"), SparkUtils.parquetFilesFilter).length shouldEqual 0
+
+        // given we query again (hits staging)
+        result = queryExecutor.execute(query)
+
+        // then same result as before
+        result.count() shouldBe 2
     }
   }
 }

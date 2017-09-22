@@ -1,7 +1,7 @@
 package com.scality.clueso.query
 
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import java.util.{concurrent => juc}
 
 import com.scality.clueso.{CluesoConfig, CluesoConstants, SparkUtils}
@@ -23,14 +23,20 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
   SearchMetricsSource(spark, config)
 
-  Future {
-    while (true) {
+  val metricsRegisterCancel = new AtomicBoolean(false)
+
+  val metricsRegisterThread = Future {
+    while (!metricsRegisterCancel.get()) {
       Thread.sleep(5000)
 
       logger.info("Registrying new metrics")
       SearchMetricsSource.registerRddMetrics(spark)
       logger.info("Done")
     }
+  }
+
+  sys.addShutdownHook {
+    metricsRegisterCancel.set(true)
   }
 
   def printResults(f : Future[Array[String]], duration: Duration) : Int = {
