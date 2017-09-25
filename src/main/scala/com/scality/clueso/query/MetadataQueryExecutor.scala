@@ -1,11 +1,13 @@
 package com.scality.clueso.query
 
-import java.util.concurrent.Executors
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
+import java.util.concurrent.{Executors, TimeUnit}
 import java.util.{concurrent => juc}
 
 import com.scality.clueso.{CluesoConfig, CluesoConstants, SparkUtils}
 import com.typesafe.scalalogging.LazyLogging
+import org.apache.ignite.IgniteLock
+import org.apache.ignite.spark.IgniteContext
 import org.apache.spark.SparkContext
 import org.apache.spark.clueso.metrics.SearchMetricsSource
 import org.apache.spark.sql.expressions.Window
@@ -20,6 +22,9 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
   import MetadataQueryExecutor._
 
   implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
+
+  val igniteContext = new IgniteContext(spark.sparkContext,
+    () => new DockerIgniteConfig())
 
   SearchMetricsSource(spark, config)
 
@@ -75,32 +80,38 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
   val setupDfLock = new scala.collection.parallel.mutable.ParHashSet[String]()
 
-  def acquireLock(bucketName : String) = synchronized {
-    if (!setupDfLock.contains(bucketName)) {
-      setupDfLock += bucketName
-      true
-    } else
-      false
+  def acquireLock(bucketName : String) = {
+    val lock = igniteContext.ignite().reentrantLock(bucketName, true, true, true)
+    (lock, lock.tryLock(400, TimeUnit.MILLISECONDS))
   }
 
-  def releaseLock(bucketName : String) = synchronized { setupDfLock -= bucketName }
+  def releaseLock(lock : IgniteLock, bucketName : String) = {
+    lock.unlock()
+  }
 
   def getBucketDataframe(bucketName : String) : DataFrame = {
     if (!config.cacheDataframes) {
       setupDf(spark, config, bucketName)
     } else {
+      val storedRdd = igniteContext.fromCache[String, Row](bucketName)
+
       // check if cache doesn't exist
       val tableView = s"${(Math.random()*100).toInt}_$bucketName"
-      if (!bucketDfs.contains(bucketName)) {
+
+      if (storedRdd.isEmpty()) {
         val bucketDf = setupDf(spark, config, bucketName)
 
-        if (acquireLock(bucketName)) {
-          bucketDf.createOrReplaceTempView(tableView)
-          bucketDf.sparkSession.catalog.cacheTable(tableView)
+        val (lock, lockAcquired) = acquireLock(bucketName)
 
-          bucketDfs = bucketDfs.updated(bucketName, new AtomicReference(bucketDf))
+        if (lockAcquired) {
+//          bucketDf.createOrReplaceTempView(tableView)
+//          bucketDf.sparkSession.catalog.cacheTable(tableView)
+          storedRdd.saveValues(bucketDf.rdd)
+
+//          bucketDfs = bucketDfs.updated(bucketName, new AtomicReference(bucketDf))
           bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
-          releaseLock(bucketName)
+
+          releaseLock(lock, bucketName)
         }
 
         bucketDf
@@ -108,21 +119,26 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
         // cache exists
         if (bucketUpdateTs(bucketName).plus(config.mergeFrequency.toMillis).isBeforeNow) {
           // check if there's a dataframe update going on
-          if (acquireLock(bucketName)) {
+          val (lock, lockAcquired) = acquireLock(bucketName)
+
+          if (lockAcquired) {
 
             // async update dataframe if there's none already doing it
             Future {
               logger.info(s"Calculating view $tableView")
               val bucketDf = setupDf(spark, config, bucketName)
 
-              bucketDf.createOrReplaceTempView(tableView)
+//              bucketDf.createOrReplaceTempView(tableView)
 
               // this operation triggers execution
               val cachingAsync = Future {
-                bucketDf.sparkSession.catalog.cacheTable(tableView)
+//                bucketDf.sparkSession.catalog.cacheTable(tableView)
+                storedRdd.clear()
+                storedRdd.saveValues(bucketDf.rdd)
               }
               import scala.concurrent.duration._
               Await.ready(cachingAsync, 3 minutes)
+
 
               bucketDf
             } map { bucketDf =>
@@ -131,7 +147,7 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
               logger.info(s"Atomically swapping RDD for bucket = $bucketName ( new = $tableView )")
               val oldDf = bucketDfs.getOrElse(bucketName, new AtomicReference()).getAndSet(bucketDf)
               bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
-              releaseLock(bucketName) // unlock
+              releaseLock(lock, bucketName) // unlock
 
               // sleep before deleting oldDf
               Thread.sleep(10000) // TODO make configurable
@@ -145,7 +161,8 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
         }
 
         //  return most recent cached version (always)
-        bucketDfs(bucketName).get()
+        spark.createDataFrame(storedRdd.values, CluesoConstants.storedEventSchema)
+//        bucketDfs(bucketName).get()
       }
     }
   }

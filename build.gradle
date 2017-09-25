@@ -71,6 +71,10 @@ dependencies {
     // tools command line opt parsing
     compile group: 'org.rogach', name: 'scallop_2.11', version: '3.1.0'
 
+    // ignite
+    compile group: 'org.apache.ignite', name: 'ignite-spark', version: '2.2.0'
+    compile group: 'org.apache.ignite', name: 'ignite-log4j', version: '2.2.0'
+
 
     testCompile 'org.apache.spark:spark-sql_'+scalaVersion+':' + sparkVersion
     testCompile 'org.apache.spark:spark-streaming_'+scalaVersion+':' + sparkVersion
