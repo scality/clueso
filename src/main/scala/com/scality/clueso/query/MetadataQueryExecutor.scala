@@ -23,8 +23,7 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
   implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
 
-  // TODO read from config
-  val alluxioFs = FileSystem.get(new URI("alluxio://alluxio-master:19998/"), hadoopConfig(config))
+  val alluxioFs = FileSystem.get(new URI(s"${config.alluxioUrl}/"), hadoopConfig(config))
 
   SearchMetricsSource(spark, config)
 
@@ -74,9 +73,8 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
     println("[" +  resultArray.mkString(",") + "]")
   }
 
-  // TODO config for alluxio-master
   def alluxioLockPath(bucketName : String) =
-    new Path(s"alluxio://alluxio-master:19998/lock_$bucketName")
+    new Path(s"${config.alluxioUrl}/lock_$bucketName")
 
   def acquireLock(bucketName : String) = synchronized {
     // TODO race condition on alluxio?
@@ -95,11 +93,11 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
   // TODO config alluxio master
   def alluxioCachePath(bucketName : String) =
-    new Path(s"alluxio://alluxio-master:19998/bucket_$bucketName")
+    new Path(s"${config.alluxioUrl}/bucket_$bucketName")
 
   // TODO config alluxio master
   def alluxioTempPath(bucketName : Option[String]) =
-    new Path(s"alluxio://alluxio-master:19998/tmp_${(Math.random()*10000).toLong}_${bucketName.getOrElse("")}")
+    new Path(s"${config.alluxioUrl}/tmp_${(Math.random()*10000).toLong}_${bucketName.getOrElse("")}")
 
 
   def getBucketDataframe(bucketName : String) : DataFrame = {
@@ -280,7 +278,6 @@ object MetadataQueryExecutor extends LazyLogging {
     var result = landingTable.select(fillNonExistingColumns(colsLanding, unionCols):_*)
       .union(stagingTable.select(fillNonExistingColumns(colsStaging, unionCols):_*))
       .orderBy(col("key"))
-//      .withColumn("rank", dense_rank().over(windowSpec)) // duplicates TODO /!\
       .withColumn("rank", row_number().over(windowSpec))
       .where(col("rank").lt(2).and(col("type") =!= "delete"))
       .select(col("bucket"),

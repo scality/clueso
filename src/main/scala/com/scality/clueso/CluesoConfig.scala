@@ -39,6 +39,11 @@ class CluesoConfig(config: Config) {
   val graphiteHost = config.getString("graphite.hostname")
   val graphitePort = config.getInt("graphite.port")
 
+  val alluxioHost = config.getString("alluxio.hostname")
+  val alluxioPort = config.getInt("alluxio.port")
+
+  def alluxioUrl = s"alluxio://$alluxioHost:$alluxioPort"
+
   import scala.collection.JavaConversions._
   override def toString: String = config.entrySet().map { entry =>
       s"  ${entry.getKey} = ${entry.getValue.toString}"

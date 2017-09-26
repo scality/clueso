@@ -350,6 +350,11 @@ trait SparkContextSetup {
     // create dirs
     val fs = SparkUtils.buildHadoopFs(config)
 
+    val bucketPath = new Path(s"s3a://${config.bucketName}")
+    if (!fs.exists(bucketPath)) {
+      fs.create(bucketPath, true)
+    }
+
     fs.delete(new Path(config.stagingPath), true)
     fs.delete(new Path(config.landingPath), true)
 
