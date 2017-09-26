@@ -155,7 +155,7 @@ class TableFilesMerger(spark : SparkSession, config: CluesoConfig) extends LazyL
         removeProcessedFromLanding(landingPartitionPath, startTs)
       } catch {
         case e: Throwable =>
-          println(e)
+          logger.error("Thrown err from merger", e)
       } finally {
         releaseLock(lockFilePath)
       }
