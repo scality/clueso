@@ -33,7 +33,7 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
     while (!metricsRegisterCancel.get()) {
       Thread.sleep(5000)
 
-      logger.info("Registrying new metrics")
+      logger.info("Registering new metrics")
       SearchMetricsSource.registerRddMetrics(spark)
       logger.info("Done")
     }
