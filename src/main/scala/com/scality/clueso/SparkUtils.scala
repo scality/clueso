@@ -31,6 +31,8 @@ object SparkUtils {
     c.set("fs.s3a.access.key", config.s3AccessKey)
     c.set("fs.s3a.secret.key", config.s3SecretKey)
     c.set("fs.s3a.path.style.access", config.s3PathStyleAccess)
+    c.set("fs.alluxio.impl", "alluxio.hadoop.FileSystem")
+
     c
   }
 
@@ -47,6 +49,7 @@ object SparkUtils {
       .config("spark.hadoop.fs.s3a.secret.key", config.s3SecretKey)
       .config("spark.hadoop.fs.s3a.path.style.access", config.s3PathStyleAccess)
       .config("spark.sql.streaming.metricsEnabled", "true")
+      .config("fs.alluxio.impl", "alluxio.hadoop.FileSystem")
 
   }
 
@@ -62,13 +65,14 @@ object SparkUtils {
     spark.conf.set("spark.hadoop.fs.s3a.path.style.access", config.s3PathStyleAccess)
     spark.conf.set("fs.s3a.path.style.access", config.s3PathStyleAccess)
     spark.conf.set("spark.sql.streaming.metricsEnabled", "true")
+    spark.conf.set("fs.alluxio.impl", "alluxio.hadoop.FileSystem")
   }
 
   def getQueryResults(spark : SparkSession, queryExecutor: MetadataQueryExecutor, query : MetadataQuery) = {
     val result = queryExecutor.execute(query)
 
     val resultArray = try {
-      val jsonResults = result.toJSON.collect()
+      val jsonResults = result.toJSON.take(query.limit)
       if (jsonResults.size > 0) {
         jsonResults.map(_.replaceAll("`",""))
       } else {
