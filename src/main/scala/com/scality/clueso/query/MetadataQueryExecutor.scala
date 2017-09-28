@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{Date, concurrent => juc}
 
 import com.scality.clueso.SparkUtils.hadoopConfig
-import com.scality.clueso.{CluesoConfig, CluesoConstants, SparkUtils}
+import com.scality.clueso.{AlluxioUtils, CluesoConfig, CluesoConstants, SparkUtils}
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkContext
@@ -19,10 +19,13 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
 
 class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends LazyLogging {
+  import AlluxioUtils._
   import MetadataQueryExecutor._
 
+  implicit val _config = config
   implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
 
+  var lockedBucketName : Option[String] = None
   val alluxioFs = FileSystem.get(new URI(s"${config.alluxioUrl}/"), hadoopConfig(config))
 
   SearchMetricsSource(spark, config)
@@ -41,6 +44,8 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
   sys.addShutdownHook {
     metricsRegisterCancel.set(true)
+    lockedBucketName.map(releaseLock)
+    alluxioFs.close()
   }
 
   def printResults(f : Future[Array[String]], duration: Duration) : Int = {
@@ -73,32 +78,21 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
     println("[" +  resultArray.mkString(",") + "]")
   }
 
-  def alluxioLockPath(bucketName : String) =
-    new Path(s"${config.alluxioUrl}/lock_$bucketName")
-
   def acquireLock(bucketName : String) = synchronized {
-    // TODO race condition on alluxio?
-    if (!alluxioFs.exists(alluxioLockPath(bucketName))) {
-//      setupDfLock += bucketName
-      alluxioFs.create(alluxioLockPath(bucketName), false)
-      true
-    } else
-      false
+    val res = AlluxioUtils.acquireLock(alluxioFs, bucketName)
+
+
+    if (res) {
+      lockedBucketName = Some(bucketName)
+    }
+
+    res
   }
 
   def releaseLock(bucketName : String) = synchronized {
-//    setupDfLock -= bucketName
-    alluxioFs.delete(alluxioLockPath(bucketName), false)
+    deleteLockFile(alluxioFs, bucketName)
+    lockedBucketName = None
   }
-
-  // TODO config alluxio master
-  def alluxioCachePath(bucketName : String) =
-    new Path(s"${config.alluxioUrl}/bucket_$bucketName")
-
-  // TODO config alluxio master
-  def alluxioTempPath(bucketName : Option[String]) =
-    new Path(s"${config.alluxioUrl}/tmp_${(Math.random()*10000).toLong}_${bucketName.getOrElse("")}")
-
 
   def getBucketDataframe(bucketName : String) : DataFrame = {
     if (!config.cacheDataframes) {
