@@ -10,13 +10,13 @@ class CluesoConfig(config: Config) {
   val s3PathStyleAccess = config.getString("s3_path_style_access")
   val checkpointPath = config.getString("checkpoint_path")
 
-  val checkpointUrl = s"s3a//$bucketName$checkpointPath"
-
   // locations
   val bucketName = config.getString("bucket_name")
   val bucketLandingPath = config.getString("bucket_landing_path")
   val bucketStagingPath = config.getString("bucket_staging_path")
   val bucketMergePath = config.getString("bucket_merge_path")
+
+  val checkpointUrl = s"s3a//$bucketName$checkpointPath"
 
   val landingPath = s"s3a://$bucketName$bucketLandingPath"
   val stagingPath = s"s3a://$bucketName$bucketStagingPath"
@@ -43,6 +43,12 @@ class CluesoConfig(config: Config) {
 
   val alluxioHost = config.getString("alluxio.hostname")
   val alluxioPort = config.getInt("alluxio.port")
+
+  // number of files to keep
+  val pastCacheRetention = config.getInt("alluxio.cache_retention_nofiles")
+
+  // controls after how much time should we evict the oldest cache, after finish a new computation
+  val cleanPastCacheDelay = config.getDuration("alluxio.clean_past_cache_delay")
 
   def alluxioUrl = s"alluxio://$alluxioHost:$alluxioPort"
 

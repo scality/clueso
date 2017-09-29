@@ -34,6 +34,7 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
   val metricsRegisterThread = Future {
     while (!metricsRegisterCancel.get()) {
+      // TODO change to config?
       Thread.sleep(5000)
 
       logger.info("Registering new metrics")
@@ -48,20 +49,17 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
     alluxioFs.close()
   }
 
-  def printResults(f : Future[Array[String]], duration: Duration) : Int = {
+  def printResults(f : Future[Array[String]], duration: Duration) = {
     try {
       val result = Await.result[Array[String]](f, duration)
       println(s"RESULT:[${result.mkString(",")}]")
-      -1
     } catch {
       case t:TimeoutException => {
         println("")
-        -1
       }
       case t:Throwable => {
         logger.error("Error while printing results", t)
         println(s"ERROR:${t.toString}")
-        -1
       }
     }
 
@@ -94,22 +92,31 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
     lockedBucketName = None
   }
 
+
+
   def getBucketDataframe(bucketName : String) : DataFrame = {
     if (!config.cacheDataframes) {
       setupDf(spark, config, bucketName)
     } else {
       // check if cache doesn't exist
 
-      val cachePath = alluxioCachePath(bucketName)
+//      val cachePath = alluxioCachePath(bucketName)
+
+      val cachePath : Option[Path] = getLatestCachePath(alluxioFs, bucketName)
+
 //      if (!bucketDfs.contains(bucketName)) {
-      if (!alluxioFs.exists(cachePath)) {
+//      if (!alluxioFs.exists(cachePath)) {
+      if (cachePath.isEmpty) {
         val bucketDf = setupDf(spark, config, bucketName)
 
-        if (acquireLock(bucketName)) {
+//        if (acquireLock(bucketName)) {
+        if (!cacheComputationBeingExecuted(alluxioFs, bucketName)) {
 
-          bucketDf.write.parquet(alluxioCachePath(bucketName).toUri.toString)
+          val tmpDir = alluxioTempPath(Some(bucketName))
+          bucketDf.write.parquet(tmpDir.toUri.toString)
 
-          releaseLock(bucketName)
+          val tableView = alluxioCachePath(bucketName).toUri.toString
+          alluxioFs.rename(tmpDir, new Path(tableView))
         }
 
         bucketDf
@@ -117,40 +124,34 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
         // cache exists
 
         // grab timestamp of _SUCCESS
-        val fileStatus = alluxioFs.getFileStatus(new Path(cachePath, "_SUCCESS"))
+        val fileStatus = alluxioFs.getFileStatus(new Path(cachePath.get, "_SUCCESS"))
         val now = new Date().getTime
         logger.info(s"Cache timestamp = ${fileStatus.getModificationTime} ( now = $now )")
 
         if (fileStatus.getModificationTime + config.mergeFrequency.toMillis < now) {
           // check if there's a dataframe update going on
-          if (acquireLock(bucketName)) {
+          if (!cacheComputationBeingExecuted(alluxioFs, bucketName)) {
 
-            val tableView = alluxioTempPath(Some(bucketName)).toUri.toString
+            val randomTempPath = alluxioTempPath(Some(bucketName)).toUri.toString
 
             // async update dataframe if there's none already doing it
             Future {
-              logger.info(s"Calculating view $tableView")
+              logger.info(s"Calculating view $randomTempPath")
               setupDf(spark, config, bucketName)
             } map { bucketDf =>
-              logger.info(s"Calculating view $tableView")
+              logger.info(s"Calculating view $randomTempPath")
 
               // write it to Alluxio with a random viewName
-              bucketDf.write.parquet(tableView)
+              bucketDf.write.parquet(randomTempPath)
 
-              val randomTempPath = alluxioTempPath(None)
+              val tableView = alluxioCachePath(bucketName).toUri.toString
               logger.info(s"Atomically swapping RDD for bucket = $bucketName ( new = $tableView , old = $randomTempPath)")
               // once finished, swap atomically with existing bucket
+              alluxioFs.rename(new Path(randomTempPath), new Path(tableView))
 
-              // renames existing bucket to a random name
-              alluxioFs.rename(alluxioCachePath(bucketName), randomTempPath)
-              alluxioFs.rename(new Path(tableView), alluxioCachePath(bucketName))
-
-              releaseLock(bucketName) // unlock
-
-              // sleep before deleting oldDf
-              Thread.sleep(10000) // TODO make configurable
-              logger.info(s"Deleting $randomTempPath from Alluxio after 10sec")
-              alluxioFs.delete(randomTempPath, true)
+              // sleep before the cleanup
+              Thread.sleep(config.cleanPastCacheDelay.toMillis) // TODO make configurable
+              cleanPastCaches(alluxioFs, bucketName)
             }
           }
         }
@@ -161,7 +162,6 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
       }
     }
   }
-
 
   def execute(query : MetadataQuery) = {
     val bucketName = query.bucketName
