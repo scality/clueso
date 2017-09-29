@@ -123,9 +123,5 @@ object AlluxioUtils extends LazyLogging {
           logger.warn(s"Failed removing oldest cache for bucket $bucketName")
       }
     }
-
-
-//
   }
-
 }
