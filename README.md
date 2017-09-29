@@ -48,4 +48,15 @@ number of parquet files in total for that bucket.
 
 By selecting `loop=true`, it will periodically poll and send information to graphite.
 
+Please set GRAPHITE_HOST and GRAPHITE_PORT 
+
+
+
+
+
+
+
+
+
+
 
