@@ -115,15 +115,6 @@ task toolShadowJar(type: com.github.jengelman.gradle.plugins.shadow.tasks.Shadow
     mergeServiceFiles()
     classifier = 'tool'
 
-//    from(project.convention.getPlugin(JavaPluginConvention).sourceSets.main.output)
-
-//    from {
-//        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
-//        sourceSets.main.output.collect { it.isDirectory() ? it : zipTree(it) }
-//    }
-
-
-//    configurations = [project.configurations.runtime, project.configurations.shadow, sourceSets.main.output]
     from sourceSets.main.output
     configurations = [project.configurations.runtime, project.configurations.shadow]
 
@@ -131,8 +122,6 @@ task toolShadowJar(type: com.github.jengelman.gradle.plugins.shadow.tasks.Shadow
     exclude('metrics.properties')
 
     zip64 true
-
-
 }
 
 
@@ -146,4 +135,19 @@ idea {
 
 test {
     maxParallelForks = 1
+}
+
+task buildTool() {
+    dependsOn toolShadowJar
+
+    doLast {
+        copy {
+            from toolShadowJar.outputs
+            into './dist/tool'
+        }
+        copy {
+            from './bin/'
+            into './dist/tool'
+        }
+    }
 }

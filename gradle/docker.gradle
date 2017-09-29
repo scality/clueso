@@ -18,24 +18,25 @@ import com.bmuschko.gradle.docker.tasks.image.*
  * PULL *
  ********/
 
-task pullGraphiteImage(type: DockerPullImage) {
-    repository = "kamon/grafana_graphite"
+task pullS3Image(type: DockerPullImage) {
+    repository = "scality/s3server"
     tag = "latest"
 }
 
-task pullAlluxioImage(type: DockerPullImage) {
-    repository = "alluxio/alluxio-community"
-    tag = "1.5.0"
+
+task pullGraphiteImage(type: DockerPullImage) {
+    repository = "kamon/grafana_graphite"
+    tag = "latest"
 }
 
 /*********
  * BUILD *
  *********/
 
-//task builAlluxioImage(type: DockerBuildImage) {
-//    inputDir = file('docker/myapp')
-//    tag = 'test/myapp'
-//}
+task buildAlluxioImage(type: DockerBuildImage) {
+    inputDir = file('docker/images/alluxio')
+    tag = 'scality/alluxio:latest'
+}
 
 task builLivyImage(type: DockerBuildImage) {
     inputDir = file('docker/images/clueso-docker-livy')
@@ -64,12 +65,22 @@ task builSparkWorkerImage(type: DockerBuildImage) {
  * CREATE *
  **********/
 
+task createS3Container(type: DockerCreateContainer) {
+    dependsOn pullS3Image
+
+    targetImageId { 'scality/s3server:latest' }
+    portBindings = [ '8000:8000']
+
+    env = [
+    'SCALITY_ACCESS_KEY_ID=accessKey1',
+    'SCALITY_SECRET_ACCESS_KEY=verySecretKey1']
+}
+
 task createGraphiteContainer(type: DockerCreateContainer) {
     dependsOn pullGraphiteImage
-    containerName = 'graphite'
 
     targetImageId { 'kamon/grafana_graphite:latest' }
-    portBindings = [ '8000:80',
+    portBindings = [ '8080:80',
                      '8081:81',
                      '8125:8125/udp',
                      '8126:8126',
@@ -77,22 +88,21 @@ task createGraphiteContainer(type: DockerCreateContainer) {
                      '2004:2004',
                      '7002:7002',
                      '3000:3000']
+
+    volumes = [ 'docker/conf/grafana/dashboards/clueso-dashboard.json:/src/dashboards/clueso.json']
 }
 
 
 task createAlluxioMasterContainer(type: DockerCreateContainer) {
-    dependsOn pullAlluxioImage
-    targetImageId { pullAlluxioImage.getImageId() }
+    dependsOn buildAlluxioImage
+    targetImageId { buildAlluxioImage.getImageId() }
 
     doFirst {
         mkdir 'tmp/docker/underStorage'
     }
 
-    containerName = 'alluxio-master'
-
-    //targetImageId { 'scality/clueso-alluxio' }
-    portBindings = [ "19998:19998",
-                     "19999:19999" ]
+    portBindings = [ '19998:19998',
+                     '19999:19999' ]
 
     env = [ 'ALLUXIO_UNDERFS_ADDRESS=/underStorage',
             'ALLUXIO_MASTER_HOSTNAME=localhost' ]
@@ -104,22 +114,54 @@ task createAlluxioMasterContainer(type: DockerCreateContainer) {
 }
 
 task createSparkMasterContainer(type: DockerCreateContainer) {
-//    dependsOn buildMyAppImage
-//    targetImageId { buildMyAppImage.getImageId() }
-    portBindings = ['8080:8080']
+    dependsOn builSparkMasterImage
+    dependsOn createGraphiteContainer
+    targetImageId { builSparkWorkerImage.getImageId() }
+
+
+    // TODO test
+    links = [ createGraphiteContainer.getImageId()+':graphite']
+
+    portBindings = ['8070:8080', '7077:7077']
 }
 
 task createSparkWorkerContainer(type: DockerCreateContainer) {
-//    dependsOn buildMyAppImage
-//    targetImageId { buildMyAppImage.getImageId() }
-    portBindings = ['8080:8080']
+    dependsOn builSparkWorkerImage
+    dependsOn createGraphiteContainer
+    dependsOn createSparkMasterContainer
+    dependsOn createAlluxioMasterContainer
+
+    targetImageId { builSparkWorkerImage.getImageId() }
+
+    links = [
+        createGraphiteContainer.getImageId()+':graphite',
+        createSparkMasterContainer.getImageId()+':spark-master',
+        createAlluxioMasterContainer.getImageId()+':alluxio-master'
+    ]
+
+    portBindings = ['30000:30000', '8071:8081']
+
+    env = [
+        'SPARK_MASTER=spark://spark-master:7077',
+        'ALLUXIO_UNDERFS_ADDRESS=/underStorage',
+        'ALLUXIO_MASTER_HOSTNAME=alluxio-master'
+    ]
 }
 
 /*********
  * START *
  *********/
 
-// TODO S3
+task startS3Container(type: DockerStartContainer) {
+    dependsOn createS3Container
+    targetContainerId { createS3Container.getContainerId() }
+
+    doLast {
+        project.logger.lifecycle('Waiting 10sec for S3 to come to live')
+        sleep(10000)
+    }
+}
+
 
 task startGraphiteContainer(type: DockerStartContainer) {
     dependsOn createGraphiteContainer
@@ -145,6 +187,10 @@ task startSparkWorkerContainer(type: DockerStartContainer) {
 /********
  * STOP *
  ********/
+
+task stopS3Container(type: DockerStopContainer) {
+    targetContainerId { createS3Container.getContainerId() }
+}
 
 task stopGraphiteContainer(type: DockerStopContainer) {
     targetContainerId { createGraphiteContainer.getContainerId() }
@@ -179,15 +225,24 @@ task removeAlluxioMasterContainer(type: DockerRemoveContainer) {
     force = true
 }
 
+task removeS3Container(type: DockerRemoveContainer) {
+    dependsOn stopS3Container
+    targetContainerId { stopS3Container.getContainerId() }
+    force = true
+}
+
+
 
 task integrationTest(type: Test) {
+    dependsOn startS3Container
     dependsOn startGraphiteContainer
     dependsOn startAlluxioMasterContainer
-    // dependsOn // s3 container
+//    dependsOn startSparkWorkerContainer
 
-//    finalizedBy stopAlluxioMasterContainer
-//    finalizedBy stopGraphiteContainer
+//    finalizedBy stopSparkWorkerContainer
+//    finalizedBy stopSparkMasterContainer
     finalizedBy removeAlluxioMasterContainer
     finalizedBy removeGraphiteContainer
+    finalizedBy removeS3Container
 }
 
