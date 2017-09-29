@@ -10,6 +10,8 @@ class CluesoConfig(config: Config) {
   val s3PathStyleAccess = config.getString("s3_path_style_access")
   val checkpointPath = config.getString("checkpoint_path")
 
+  val checkpointUrl = s"s3a//$bucketName$checkpointPath"
+
   // locations
   val bucketName = config.getString("bucket_name")
   val bucketLandingPath = config.getString("bucket_landing_path")

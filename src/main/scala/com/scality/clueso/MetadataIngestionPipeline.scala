@@ -81,7 +81,7 @@ object MetadataIngestionPipeline {
       .trigger(ProcessingTime(config.triggerTime.toMillis))
 
     val query = writeStream
-      .option("checkpointLocation", config.checkpointPath)
+      .option("checkpointLocation", config.checkpointUrl)
       .format("parquet")
       .partitionBy("bucket")
       .outputMode(OutputMode.Append())
