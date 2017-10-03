@@ -34,7 +34,7 @@ RUN mkdir -p /apps/build/ && \
 		    ./dev/change-scala-version.sh 2.11
 
 
-RUN /apps/build/spark-2.1.1_2.11/dev/make-distribution.sh --name spark-2.1.1_2.11 --tgz -Phadoop-2.7 -Dhadoop.version=2.8.1  -DskipTests -DXms=2g
+RUN cd /apps/build/spark-2.1.1_2.11 && /apps/build/spark-2.1.1_2.11/dev/make-distribution.sh --name spark-2.1.1_2.11 --tgz -Phadoop-2.7 -Dhadoop.version=2.8.1  -DskipTests -DXms=2g
 
 ENV SPARK_HOME /spark/
 
@@ -61,3 +61,4 @@ COPY entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 ENTRYPOINT ["entrypoint.sh"]
+
