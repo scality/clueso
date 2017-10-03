@@ -39,7 +39,7 @@ task buildGraphiteImage(type: DockerBuildImage) {
 }
 
 
-task builLivyImage(type: DockerBuildImage) {
+task buildLivyImage(type: DockerBuildImage) {
     inputDir = file('docker/images/clueso-docker-livy')
     tag = 'scality/clueso-livy:0.4.0-alluxio'
 }
