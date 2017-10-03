@@ -65,3 +65,14 @@ typings/
 docker/logs/*
 # but keep the folder
 !docker/logs/.keep
+
+
+# gradle etc.
+.gradle/*
+.idea/*
+clueso.iml
+out/*
+src/main/main.iml
+src/test/test.iml
+build/*
+
