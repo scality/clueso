@@ -49,7 +49,7 @@ RUN mkdir -p /apps/build/ && \
     git checkout tags/v2.1.1 && \
     ./dev/change-scala-version.sh 2.11
 
-RUN cd $SPARK_BUILD_DIR && ./dev/make-distribution.sh --name $SPARK_BUILD_NAME --tgz -Phadoop-2.7 -Phive -Phive-thriftserver -Pmesos -Dhadoop.version=2.8.0 -DzincPort=3036 -DskipTests -Pyarn -e
+RUN cd $SPARK_BUILD_DIR && ./dev/make-distribution.sh --name $SPARK_BUILD_NAME --tgz -Phadoop-2.7 -Phive -Phive-thriftserver -Pmesos -Dhadoop.version=2.8.0 -DskipTests -Pyarn -e
 
 RUN tar -zxvf /apps/build/$SPARK_BUILD_NAME/spark-2.1.1-bin-$SPARK_BUILD_NAME.tgz -C /tmp/ && \
     mkdir -p $SPARK_HOME && \
