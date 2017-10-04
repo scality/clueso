@@ -42,7 +42,6 @@ RUN tar -zxvf /apps/build/spark-2.1.1_2.11/spark-2.1.1-bin-spark-2.1.1_2.11.tgz 
 		    rm -rf -- /tmp/spark-2.1.1-bin-spark-2.1.1_2.11/
 
 
-
 #
 #
 #      && wget https://dl.dropboxusercontent.com/u/4882345/packages/spark-2.1.2-SNAPSHOT-bin-spark-2.1.0-hive.tgz \

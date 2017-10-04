@@ -1,16 +1,11 @@
-FROM ubuntu
+FROM java:openjdk-8-jre
 
-ARG ALLUXIO_TARBALL=http://downloads.alluxio.org/downloads/files/1.5.0/alluxio-1.5.0-bin.tar.gz
+ENV ALLUXIO_VERSION 1.5.0
 
-ADD ${ALLUXIO_TARBALL} /opt/
-
-RUN apt-get update && apt-get install -yq --no-install-recommends --force-yes \
-    openjdk-8-jdk && \
-    rm -rf /var/cache/apt/* && \
-    # if the tarball was remote, it needs to be untarred
-    cd /opt && tar -zxvf alluxio-*gz && \
-        ls && rm -rf alluxio-*gz && mv alluxio-* alluxio && \
-        ln -s /opt/alluxio-1.5.0 /opt/alluxio
+RUN mkdir -p /opt && cd /opt && wget http://downloads.alluxio.org/downloads/files/"$ALLUXIO_VERSION"/alluxio-"$ALLUXIO_VERSION"-bin.tar.gz && \
+       tar -zxvf alluxio-"$ALLUXIO_VERSION"-bin.tar.gz && \
+       mv alluxio-"$ALLUXIO_VERSION" alluxio && \
+       rm alluxio-"$ALLUXIO_VERSION"-bin.tar.gz
 
 COPY bin/* /opt/alluxio/bin/
 COPY conf /opt/alluxio/conf/
