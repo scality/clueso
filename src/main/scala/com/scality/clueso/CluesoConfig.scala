@@ -50,7 +50,7 @@ class CluesoConfig(config: Config) {
   // controls after how much time should we evict the oldest cache, after finish a new computation
   val cleanPastCacheDelay = config.getDuration("alluxio.clean_past_cache_delay")
 
-  def alluxioUrl = s"alluxio://$alluxioHost:$alluxioPort"
+  def alluxioUrl = s"alluxio://$alluxioHost:$alluxioPort/"
 
   import scala.collection.JavaConversions._
   override def toString: String = config.entrySet().map { entry =>
