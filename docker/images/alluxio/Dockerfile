@@ -1,4 +1,4 @@
-FROM java:openjdk-8-jre
+FROM openjdk:8
 
 ENV ALLUXIO_VERSION 1.5.0
 
