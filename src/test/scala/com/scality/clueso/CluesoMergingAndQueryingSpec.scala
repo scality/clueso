@@ -38,7 +38,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
           .parquet(config.landingPath)
 
 
-        // TODO cache?
+        // TODO test with cache disabled. Currently testing with cache configured
         val queryExecutor = MetadataQueryExecutor(spark, config)
 
         // given

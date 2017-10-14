@@ -19,14 +19,10 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
 
 class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends LazyLogging {
-  import AlluxioUtils._
   import MetadataQueryExecutor._
 
   implicit val _config = config
   implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
-
-  var lockedBucketName : Option[String] = None
-  val alluxioFs = FileSystem.get(new URI(s"${config.alluxioUrl}/"), hadoopConfig(config))
 
   SearchMetricsSource(spark, config)
 
@@ -45,8 +41,6 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
   sys.addShutdownHook {
     metricsRegisterCancel.set(true)
-    lockedBucketName.map(releaseLock)
-    alluxioFs.close()
   }
 
   def printResults(f : Future[Array[String]], duration: Duration) = {
@@ -76,91 +70,11 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
     println("[" +  resultArray.mkString(",") + "]")
   }
 
-  def acquireLock(bucketName : String) = synchronized {
-    val res = AlluxioUtils.acquireLock(alluxioFs, bucketName)
-
-
-    if (res) {
-      lockedBucketName = Some(bucketName)
-    }
-
-    res
-  }
-
-  def releaseLock(bucketName : String) = synchronized {
-    deleteLockFile(alluxioFs, bucketName)
-    lockedBucketName = None
-  }
 
 
 
   def getBucketDataframe(bucketName : String) : DataFrame = {
-    if (!config.cacheDataframes) {
       setupDf(spark, config, bucketName)
-    } else {
-      // check if cache doesn't exist
-
-//      val cachePath = alluxioCachePath(bucketName)
-
-      val cachePath : Option[Path] = getLatestCachePath(alluxioFs, bucketName)
-
-//      if (!bucketDfs.contains(bucketName)) {
-//      if (!alluxioFs.exists(cachePath)) {
-      if (cachePath.isEmpty) {
-        val bucketDf = setupDf(spark, config, bucketName)
-
-//        if (acquireLock(bucketName)) {
-        if (!cacheComputationBeingExecuted(alluxioFs, bucketName)) {
-
-          val tmpDir = alluxioTempPath(Some(bucketName))
-          bucketDf.write.parquet(tmpDir.toUri.toString)
-
-          val tableView = alluxioCachePath(bucketName).toUri.toString
-          alluxioFs.rename(tmpDir, new Path(tableView))
-        }
-
-        bucketDf
-      } else {
-        // cache exists
-
-        // grab timestamp of _SUCCESS
-        val fileStatus = alluxioFs.getFileStatus(new Path(cachePath.get, "_SUCCESS"))
-        val now = new Date().getTime
-        logger.info(s"Cache timestamp = ${fileStatus.getModificationTime} ( now = $now )")
-
-        if (fileStatus.getModificationTime + config.mergeFrequency.toMillis < now) {
-          // check if there's a dataframe update going on
-          if (!cacheComputationBeingExecuted(alluxioFs, bucketName)) {
-
-            val randomTempPath = alluxioTempPath(Some(bucketName)).toUri.toString
-
-            // async update dataframe if there's none already doing it
-            Future {
-              logger.info(s"Calculating view $randomTempPath")
-              setupDf(spark, config, bucketName)
-            } map { bucketDf =>
-              logger.info(s"Calculating view $randomTempPath")
-
-              // write it to Alluxio with a random viewName
-              bucketDf.write.parquet(randomTempPath)
-
-              val tableView = alluxioCachePath(bucketName).toUri.toString
-              logger.info(s"Atomically swapping RDD for bucket = $bucketName ( new = $tableView , old = $randomTempPath)")
-              // once finished, swap atomically with existing bucket
-              alluxioFs.rename(new Path(randomTempPath), new Path(tableView))
-
-              // sleep before the cleanup
-              Thread.sleep(config.cleanPastCacheDelay.toMillis) // TODO make configurable
-              cleanPastCaches(alluxioFs, bucketName)
-            }
-          }
-        }
-
-        //  return most recent cached version (always)
-        spark.read
-          .parquet(alluxioCachePath(bucketName).toString.toString)
-      }
-    }
   }
 
   def execute(query : MetadataQuery) = {
@@ -209,14 +123,19 @@ object MetadataQueryExecutor extends LazyLogging {
     col("message"))
 
   def getColdStagingTable(spark : SparkSession, config : CluesoConfig, bucketName : String) = {
+    println("in get cold staging table!!")
+    println("uri!!", AlluxioUtils.stagingURI(config))
     val _stagingTable = spark.read
       .schema(CluesoConstants.storedEventSchema)
-      .parquet(config.stagingPath)
+      .parquet(AlluxioUtils.stagingURI(config))
       .createOrReplaceTempView("staging")
 
+    // what does this do?
+    // why not in Landing?
     spark.catalog.refreshTable("staging")
 
     // read df
+    // need to name somehow so alluxio caches bucket separately?
     val stagingTable = spark.table("staging")
       .where(col("bucket").eqNullSafe(bucketName))
       .select(cols: _*)
@@ -226,12 +145,14 @@ object MetadataQueryExecutor extends LazyLogging {
   }
 
   def getColdLandingTable(spark : SparkSession, config : CluesoConfig, bucketName : String) = {
+    println("in get coldLanding table!!")
+    println("uri!!", AlluxioUtils.landingURI(config))
     val _landingTable = spark.read
       .schema(CluesoConstants.storedEventSchema)
-      .parquet(config.landingPath)
+      .parquet(AlluxioUtils.landingURI(config))
       .createOrReplaceTempView("landing")
 
-
+    // need to name somehow so alluxio caches bucket separately?
     var landingTable = spark.table("landing")
       .where(col("bucket").eqNullSafe(bucketName))
       .select(cols: _*)
