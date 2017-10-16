@@ -9,13 +9,13 @@ object AlluxioUtils extends LazyLogging {
   def landingURI(implicit config : CluesoConfig): String = {
     if (!config.cacheDataframes) {
       config.landingPath
-    } else s"${config.alluxioUrl}${config.alluxioLandingPath}"
+    } else s"${config.alluxioUrl}${config.bucketLandingPath}"
   }
 
   def stagingURI(implicit config : CluesoConfig): String = {
     if (!config.cacheDataframes) {
       config.stagingPath
-    } else s"${config.alluxioUrl}${config.alluxioStagingPath}"
+    } else s"${config.alluxioUrl}${config.bucketStagingPath}"
   }
 
 }

@@ -1,14 +1,11 @@
 package com.scality.clueso.query
 
-import java.net.URI
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.{Date, concurrent => juc}
+import java.util.{concurrent => juc}
 
-import com.scality.clueso.SparkUtils.hadoopConfig
 import com.scality.clueso.{AlluxioUtils, CluesoConfig, CluesoConstants, SparkUtils}
 import com.typesafe.scalalogging.LazyLogging
-import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkContext
 import org.apache.spark.clueso.metrics.SearchMetricsSource
 import org.apache.spark.sql.expressions.Window
@@ -123,8 +120,8 @@ object MetadataQueryExecutor extends LazyLogging {
     col("message"))
 
   def getColdStagingTable(spark : SparkSession, config : CluesoConfig, bucketName : String) = {
-    println("in get cold staging table!!")
-    println("uri!!", AlluxioUtils.stagingURI(config))
+    logger.debug("in get cold staging table!!")
+    logger.debug("uri!!", AlluxioUtils.stagingURI(config))
     val _stagingTable = spark.read
       .schema(CluesoConstants.storedEventSchema)
       .parquet(AlluxioUtils.stagingURI(config))
@@ -145,8 +142,8 @@ object MetadataQueryExecutor extends LazyLogging {
   }
 
   def getColdLandingTable(spark : SparkSession, config : CluesoConfig, bucketName : String) = {
-    println("in get coldLanding table!!")
-    println("uri!!", AlluxioUtils.landingURI(config))
+    logger.debug("in get coldLanding table!!")
+    logger.debug("uri!!", AlluxioUtils.landingURI(config))
     val _landingTable = spark.read
       .schema(CluesoConstants.storedEventSchema)
       .parquet(AlluxioUtils.landingURI(config))

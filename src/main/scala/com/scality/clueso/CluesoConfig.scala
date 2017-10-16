@@ -22,8 +22,8 @@ class CluesoConfig(config: Config) {
   val stagingPath = s"s3a://$bucketName$bucketStagingPath"
   val mergePath = s"s3a://$bucketName$bucketMergePath"
 
-  val alluxioLandingPath = s"s3a://$bucketName$bucketLandingPath"
-  val alluxioStagingPath = s"s3a://$bucketName$bucketStagingPath"
+  val alluxioLandingPath = s"$bucketLandingPath"
+  val alluxioStagingPath = s"$bucketStagingPath"
 
   val mergeFrequency = config.getDuration("merge_frequency")
   val mergeFactor = config.getInt("merge_factor")
