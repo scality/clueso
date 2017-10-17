@@ -6,7 +6,7 @@ import java.net.URI
 import com.scality.clueso.query.{MetadataQuery, MetadataQueryExecutor}
 import com.typesafe.config.ConfigFactory
 import org.apache.hadoop.conf.{Configuration => HadoopConfig}
-import org.apache.hadoop.fs.{FileSystem, Path, PathFilter}
+import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, lit}
 
@@ -100,9 +100,14 @@ object SparkUtils {
   }
 
   def getParquetFilesStats(fs: FileSystem, path : String) = {
-    val statusList = fs.listStatus(new Path(path), new PathFilter {
-      override def accept(path: Path): Boolean = path.getName.endsWith(".parquet")
-    })
+    val fsPath = new Path(path)
+    val statusList = if (!fs.exists(fsPath)) {
+      Array[FileStatus]()
+    } else {
+      fs.listStatus(new Path(path), new PathFilter {
+        override def accept(path: Path): Boolean = path.getName.endsWith(".parquet")
+      })
+    }
 
     val fileCount = statusList.count(_ => true)
     val avgFileSize = statusList.map(_.getLen).sum / Math.max(fileCount, 1)
