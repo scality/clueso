@@ -55,12 +55,16 @@ object MetadataIngestionPipeline {
   def main(args: Array[String]): Unit = {
     require(args.length > 0, "specify configuration file")
 
-    val config = SparkUtils.loadCluesoConfig(args.head)
+    implicit val config = SparkUtils.loadCluesoConfig(args.head)
 
     // create dir no matter what
     val fs = SparkUtils.buildHadoopFs(config)
-    fs.mkdirs(new Path(config.landingPath))
-    fs.mkdirs(new Path(config.stagingPath))
+//    fs.mkdirs(new Path(config.landingPath))
+//    fs.mkdirs(new Path(config.stagingPath))
+
+      fs.mkdirs(new Path(AlluxioUtils.landingURI))
+      fs.mkdirs(new Path(AlluxioUtils.stagingURI))
+
 
     val spark = SparkUtils.buildSparkSession(config)
       .appName("Metadata Ingestion Pipeline")
@@ -85,7 +89,8 @@ object MetadataIngestionPipeline {
       .format("parquet")
       .partitionBy("bucket")
       .outputMode(OutputMode.Append())
-      .option("path", config.landingPath)
+//      .option("path", config.landingPath)
+      .option("path", AlluxioUtils.landingURI)
       .start()
 
     query.awaitTermination()

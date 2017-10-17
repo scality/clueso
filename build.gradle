@@ -99,9 +99,9 @@ shadowJar {
         })
 
         // takes it from spark classpath
-        exclude(dependency {
-            it.moduleName == 'alluxio-core-client-hdfs'
-        })
+//        exclude(dependency {
+//            it.moduleName == 'alluxio-core-client-hdfs'
+//        })
 
         exclude(dependency {
             it.moduleGroup == 'org.apache.spark' && !it.moduleName.startsWith('spark-sql-kafka-')
