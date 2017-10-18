@@ -55,7 +55,7 @@ task builSparkMasterImage(type: DockerBuildImage) {
     tag = 'scality/spark-master:2.1.1-hadoop28'
 }
 
-task builSparkWorkerImage(type: DockerBuildImage) {
+task buildSparkWorkerImage(type: DockerBuildImage) {
     dependsOn builSparkBaseImage
     inputDir = file('docker/images/docker-spark/worker')
     tag = 'scality/spark-worker:2.1.1-hadoop28-alluxio'
@@ -116,7 +116,7 @@ task createAlluxioMasterContainer(type: DockerCreateContainer) {
 task createSparkMasterContainer(type: DockerCreateContainer) {
     dependsOn builSparkMasterImage
     dependsOn createGraphiteContainer
-    targetImageId { builSparkWorkerImage.getImageId() }
+    targetImageId { buildSparkWorkerImage.getImageId() }
 
 
     // TODO test
@@ -126,12 +126,12 @@ task createSparkMasterContainer(type: DockerCreateContainer) {
 }
 
 task createSparkWorkerContainer(type: DockerCreateContainer) {
-    dependsOn builSparkWorkerImage
+    dependsOn buildSparkWorkerImage
     dependsOn createGraphiteContainer
     dependsOn createSparkMasterContainer
     dependsOn createAlluxioMasterContainer
 
-    targetImageId { builSparkWorkerImage.getImageId() }
+    targetImageId { buildSparkWorkerImage.getImageId() }
 
     links = [
         createGraphiteContainer.getImageId()+':graphite',

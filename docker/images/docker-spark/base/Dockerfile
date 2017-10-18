@@ -54,7 +54,7 @@ RUN tar -zxvf /apps/build/spark-2.1.1_2.11/spark-2.1.1-bin-spark-2.1.1_2.11.tgz 
 
 
 COPY hive-site.xml /spark/conf/
-
+COPY conf/* /spark/conf/
 
 COPY entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/entrypoint.sh
