@@ -47,6 +47,11 @@ class CluesoConfig(config: Config) {
   val alluxioHost = config.getString("alluxio.hostname")
   val alluxioPort = config.getInt("alluxio.port")
 
+  // number of files to keep
+  val pastCacheRetention = config.getInt("alluxio.cache_retention_nofiles")
+  // controls after how much time should we evict the oldest cache, after finish a new computation
+  val cleanPastCacheDelay = config.getDuration("alluxio.clean_past_cache_delay")
+
 
   def alluxioUrl = s"alluxio://$alluxioHost:$alluxioPort/"
 

@@ -2,13 +2,14 @@ package com.scality.clueso
 
 import com.scality.clueso.merge.MergeService
 import com.typesafe.config.Config
+import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.{OutputMode, ProcessingTime}
 import org.apache.spark.sql.types.{StringType, TimestampType}
 
-object MetadataIngestionPipeline {
+object MetadataIngestionPipeline extends LazyLogging {
 
   /**
     * Applies projections and conditions to incoming data frame
@@ -61,9 +62,11 @@ object MetadataIngestionPipeline {
     val fs = SparkUtils.buildHadoopFs(config)
 //    fs.mkdirs(new Path(config.landingPath))
 //    fs.mkdirs(new Path(config.stagingPath))
+    logger.info(s"Creating directory ${AlluxioUtils.landingURI}")
+    logger.info(s"Creating directory ${AlluxioUtils.stagingURI}")
 
-      fs.mkdirs(new Path(AlluxioUtils.landingURI))
-      fs.mkdirs(new Path(AlluxioUtils.stagingURI))
+    fs.mkdirs(new Path(AlluxioUtils.landingURI))
+    fs.mkdirs(new Path(AlluxioUtils.stagingURI))
 
 
     val spark = SparkUtils.buildSparkSession(config)
