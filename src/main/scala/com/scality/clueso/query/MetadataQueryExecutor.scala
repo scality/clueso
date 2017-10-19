@@ -254,11 +254,39 @@ object MetadataQueryExecutor extends LazyLogging {
     var landingTable = spark.table("landing")
       .where(col("bucket").eqNullSafe(bucketName))
       .select(cols: _*)
-    //      .orderBy("key")
+
     landingTable
   }
 
 
+  def selectColumns(dataFrame: DataFrame) = {
+    dataFrame.select(col("bucket"),
+      col("kafkaTimestamp"),
+      col("key"),
+      col("type"),
+      col("message.`userMd`").as("userMd"),
+      col("message.`incrementer`").as("incrementer"),
+      col("message.`sourceFileName`").as("sourceFileName"),
+      col("message.`acl`").as("acl"),
+      col("message.`location`").as("location"),
+      col("message.`tags`").as("tags"),
+      col("message.`replicationInfo`").as("replicationInfo"),
+      col("message.`md-model-version`").as("md-model-version"),
+      col("message.`owner-display-name`").as("owner-display-name"),
+      col("message.`owner-id`").as("owner-id"),
+      col("message.`content-length`").as("content-length"),
+      col("message.`content-type`").as("content-type"),
+      col("message.`last-modified`").as("last-modified"),
+      col("message.`content-md5`").as("content-md5"),
+      col("message.`x-amz-server-version-id`").as("x-amz-server-version-id"),
+      col("message.`x-amz-storage-class`").as("x-amz-storage-class"),
+      col("message.`x-amz-server-side-encryption`").as("x-amz-server-side-encryption"),
+      col("message.`x-amz-server-side-encryption-aws-kms-key-id`").as("x-amz-server-side-encryption-aws-kms-key-id"),
+      col("message.`x-amz-server-side-encryption-customer-algorithm`").as("x-amz-server-side-encryption-customer-algorithm"),
+      col("message.`x-amz-website-redirect-location`").as("x-amz-website-redirect-location"),
+      col("message.`isDeleteMarker`").as("isDeleteMarker"),
+      col("message.`x-amz-version-id`").as("x-amz-version-id"))
+  }
 
   def eagerSearch(spark : SparkSession, config : CluesoConfig, bucketName : String, sqlWhereExpr : String) : Dataset[Row]= {
     val currentWorkers = Math.max(currentActiveExecutors(spark.sparkContext).count(_ => true), 1)
@@ -266,34 +294,18 @@ object MetadataQueryExecutor extends LazyLogging {
     logger.info(s"Searching DFs for bucket $bucketName – current workers = $currentWorkers")
 
     // read df
-    var stagingTable = getColdStagingTable(spark, config, bucketName)
+    var stagingTable = selectColumns(getColdStagingTable(spark, config, bucketName))
+
 
     if (!sqlWhereExpr.isEmpty) {
-      //      val filteredStaging = stagingTable
-      stagingTable = stagingTable
-        .where(sqlWhereExpr)
-        .select(col("key"))
-
-//      stagingTable = stagingTable.as("w").join(filteredStaging.as("f"), col("f.key") === col("w.key"))
-//        .select("w.*")
+      stagingTable = stagingTable.where(sqlWhereExpr)
     }
 
     if (currentWorkers > 0) {
       stagingTable = stagingTable.repartition(currentWorkers)
     }
 
-    var landingTable = getColdLandingTable(spark, config, bucketName)
-
-    if (!sqlWhereExpr.isEmpty) {
-      val filteredLanding = landingTable
-        .where(sqlWhereExpr)
-        .select(col("key"))
-        .union(stagingTable.select(col("key")))
-        .distinct()
-
-      landingTable = landingTable.as("w").join(filteredLanding.as("f"), col("f.key") === col("w.key"))
-        .select("w.*")
-    }
+    var landingTable = selectColumns(getColdLandingTable(spark, config, bucketName))
 
     if (currentWorkers > 0) {
       landingTable = landingTable.repartition(currentWorkers)
@@ -315,32 +327,6 @@ object MetadataQueryExecutor extends LazyLogging {
       .orderBy(col("key"))
       .withColumn("rank", row_number().over(windowSpec))
       .where(col("rank").lt(2).and(col("type") =!= "delete"))
-      .select(col("bucket"),
-        col("kafkaTimestamp"),
-        col("key"),
-        col("type"),
-        col("message.`userMd`").as("userMd"),
-        col("message.`incrementer`").as("incrementer"),
-        col("message.`sourceFileName`").as("sourceFileName"),
-        col("message.`acl`").as("acl"),
-        col("message.`location`").as("location"),
-        col("message.`tags`").as("tags"),
-        col("message.`replicationInfo`").as("replicationInfo"),
-        col("message.`md-model-version`").as("md-model-version"),
-        col("message.`owner-display-name`").as("owner-display-name"),
-        col("message.`owner-id`").as("owner-id"),
-        col("message.`content-length`").as("content-length"),
-        col("message.`content-type`").as("content-type"),
-        col("message.`last-modified`").as("last-modified"),
-        col("message.`content-md5`").as("content-md5"),
-        col("message.`x-amz-server-version-id`").as("x-amz-server-version-id"),
-        col("message.`x-amz-storage-class`").as("x-amz-storage-class"),
-        col("message.`x-amz-server-side-encryption`").as("x-amz-server-side-encryption"),
-        col("message.`x-amz-server-side-encryption-aws-kms-key-id`").as("x-amz-server-side-encryption-aws-kms-key-id"),
-        col("message.`x-amz-server-side-encryption-customer-algorithm`").as("x-amz-server-side-encryption-customer-algorithm"),
-        col("message.`x-amz-website-redirect-location`").as("x-amz-website-redirect-location"),
-        col("message.`isDeleteMarker`").as("isDeleteMarker"),
-        col("message.`x-amz-version-id`").as("x-amz-version-id"))
 
 //    if (currentWorkers > 0) {
 //      result = result.coalesce(currentWorkers)
