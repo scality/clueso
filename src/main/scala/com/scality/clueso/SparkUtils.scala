@@ -32,6 +32,8 @@ object SparkUtils {
     c.set("fs.s3a.secret.key", config.s3SecretKey)
     c.set("fs.s3a.path.style.access", config.s3PathStyleAccess)
     c.set("fs.alluxio.impl", "alluxio.hadoop.FileSystem")
+    c.set("alluxio.user.file.writetype.default", "CACHE_THROUGH")
+    c.set("alluxio.user.file.metadata.load.type", "Always")
 
     c
   }
@@ -50,6 +52,8 @@ object SparkUtils {
       .config("spark.hadoop.fs.s3a.path.style.access", config.s3PathStyleAccess)
       .config("spark.sql.streaming.metricsEnabled", "true")
       .config("fs.alluxio.impl", "alluxio.hadoop.FileSystem")
+      .config("alluxio.user.file.writetype.default", "CACHE_THROUGH")
+      .config("alluxio.user.file.metadata.load.type", "Always")
 
   }
 
@@ -66,6 +70,8 @@ object SparkUtils {
     spark.conf.set("fs.s3a.path.style.access", config.s3PathStyleAccess)
     spark.conf.set("spark.sql.streaming.metricsEnabled", "true")
     spark.conf.set("fs.alluxio.impl", "alluxio.hadoop.FileSystem")
+    spark.conf.set("alluxio.user.file.writetype.default", "CACHE_THROUGH")
+    spark.conf.set("alluxio.user.file.metadata.load.type", "Always")
   }
 
   def getQueryResults(spark : SparkSession, queryExecutor: MetadataQueryExecutor, query : MetadataQuery) = {
