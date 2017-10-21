@@ -56,4 +56,3 @@ services:
     environment:
       - "ADVERTISED_HOST=kafka"
       - "ADVERTISED_PORT=9092"
-      - "MESSAGE_TIMESTAMP_TYPE=LogAppendTime"
