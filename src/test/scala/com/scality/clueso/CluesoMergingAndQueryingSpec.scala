@@ -18,7 +18,8 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
     "Scenario 1: only retrieves the most recent PUT event for a given key" in withSparkContext {
       (spark, config) =>
 
-        import spark.implicits._
+        implicit val _sparkSession : SparkSession = spark
+        import _sparkSession.implicits._
 
         val fs = SparkUtils.buildHadoopFs(config)
         fs.mkdirs(new Path(config.stagingPath))
@@ -32,7 +33,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
         // when we have Landing with putA, putB, delA
         val landingDf = landingData.toDF("timestamp", "value")
-        val stream = MetadataIngestionPipeline.filterAndParseEvents(config.bucketName, landingDf)
+        val stream = MetadataIngestionPipeline. filterAndParseEvents(config.bucketName, landingDf)
         stream.write
           .partitionBy("bucket")
           .parquet(config.landingPath)
@@ -55,7 +56,8 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
     "Scenario 2: remove entries when there's a newer event with TYPE = delete for same key" in withSparkContext {
       (spark, config) =>
 
-        import spark.implicits._
+        implicit val _sparkSession : SparkSession = spark
+        import _sparkSession.implicits._
 
         val fs = SparkUtils.buildHadoopFs(config)
         fs.mkdirs(new Path(config.stagingPath))
@@ -112,7 +114,8 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
     "Scenario 3: not return entries in staging that are marked as deleted in landing" in withSparkContext {
       (spark, config) =>
 
-        import spark.implicits._
+        implicit val _sparkSession : SparkSession = spark
+        import _sparkSession.implicits._
 
         val now = new java.util.Date().getTime
 
@@ -174,7 +177,8 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
     "Scenario 4: pagination works" in withSparkContext {
       (spark, config) =>
 
-        import spark.implicits._
+        implicit val _sparkSession : SparkSession = spark
+        import _sparkSession.implicits._
 
         val now = new java.util.Date().getTime
 
@@ -256,7 +260,8 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
     "Scenario 5: queries with like '%' work" in withSparkContext {
       (spark, config) =>
 
-        import spark.implicits._
+        implicit val _sparkSession : SparkSession = spark
+        import _sparkSession.implicits._
 
         val now = new java.util.Date().getTime
 

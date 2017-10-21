@@ -134,7 +134,8 @@ class TableFilesMerger(spark : SparkSession, implicit val config: CluesoConfig) 
     println(s"Merging partition $partitionColumnName=$partitionValue into $numPartitions files")
 
     val mergeOutputId =  UUID.randomUUID().toString.replaceAll("-","").substring(0, 5)
-    val mergePath = s"${config.mergePath}/${dateFormat.format(new java.util.Date())}_$mergeOutputId"
+//    val mergePath = s"${config.mergePath}/${dateFormat.format(new java.util.Date())}_$mergeOutputId"
+    val mergePath = s"${AlluxioUtils.mergeURI}/${dateFormat.format(new java.util.Date())}_$mergeOutputId"
     val outputPath = s"$mergePath/merged_data"
 
     val lockFilePath = lockPath(mergePath)

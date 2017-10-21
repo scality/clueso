@@ -19,8 +19,8 @@ object SparkUtils {
     new CluesoConfig(_config)
   }
 
-  def buildHadoopFs(config: CluesoConfig) = {
-    FileSystem.get(new URI(config.mergePath), hadoopConfig(config))
+  def buildHadoopFs(implicit config: CluesoConfig) = {
+    FileSystem.get(new URI(AlluxioUtils.mergeURI), hadoopConfig(config))
   }
 
   def hadoopConfig(config: CluesoConfig): HadoopConfig = {

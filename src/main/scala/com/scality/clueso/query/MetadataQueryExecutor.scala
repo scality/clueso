@@ -258,7 +258,6 @@ object MetadataQueryExecutor extends LazyLogging {
     landingTable
   }
 
-
   def selectColumns(dataFrame: DataFrame) = {
     dataFrame.select(col("bucket"),
       col("kafkaTimestamp"),
@@ -296,7 +295,6 @@ object MetadataQueryExecutor extends LazyLogging {
     // read df
     var stagingTable = selectColumns(getColdStagingTable(spark, config, bucketName))
 
-
     if (!sqlWhereExpr.isEmpty) {
       stagingTable = stagingTable.where(sqlWhereExpr)
     }
@@ -327,10 +325,6 @@ object MetadataQueryExecutor extends LazyLogging {
       .orderBy(col("key"))
       .withColumn("rank", row_number().over(windowSpec))
       .where(col("rank").lt(2).and(col("type") =!= "delete"))
-
-//    if (currentWorkers > 0) {
-//      result = result.coalesce(currentWorkers)
-//    }
 
     result
   }

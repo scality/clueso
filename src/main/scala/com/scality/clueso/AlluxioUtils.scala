@@ -127,4 +127,9 @@ object AlluxioUtils extends LazyLogging {
     } else s"${config.alluxioUrl}${config.alluxioStagingPath}"
   }
 
+  def mergeURI(implicit config: CluesoConfig): String = {
+    if (!config.cacheDataframes) {
+      config.mergePath
+    } else s"${config.alluxioUrl}/merge"
+  }
 }
