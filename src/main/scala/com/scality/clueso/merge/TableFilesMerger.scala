@@ -116,7 +116,7 @@ class TableFilesMerger(spark : SparkSession, implicit val config: CluesoConfig) 
     val landedParquetFiles = fs.listStatus(new Path(landingPartitionPath), parquetFilesFilter)
     val mergedLandingFiles = landedParquetFiles.filter(lf => lf.getModificationTime < startTs - config.landingPurgeTolerance.toMillis)
 
-    logger.info("Removing processed files from Landing:\n  %s", mergedLandingFiles.map(_.getPath.getName).mkString("\n  "))
+    logger.info(s"Removing processed files from Landing:\n  ${mergedLandingFiles.map(_.getPath.getName).mkString("\n  ")}")
 
     mergedLandingFiles.foreach(lf => fs.delete(lf.getPath, false))
   }
