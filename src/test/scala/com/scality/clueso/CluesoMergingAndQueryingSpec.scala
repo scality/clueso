@@ -18,6 +18,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
     "Scenario 1: only retrieves the most recent PUT event for a given key" in withSparkContext {
       (spark, config) =>
 
+        implicit val _config = config
         implicit val _sparkSession : SparkSession = spark
         import _sparkSession.implicits._
 
@@ -56,11 +57,12 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
     "Scenario 2: remove entries when there's a newer event with TYPE = delete for same key" in withSparkContext {
       (spark, config) =>
 
+        implicit val _config = config
         implicit val _sparkSession : SparkSession = spark
         import _sparkSession.implicits._
 
         val fs = SparkUtils.buildHadoopFs(config)
-        fs.mkdirs(new Path(config.alluxioStagingPath))
+        fs.mkdirs(new Path(AlluxioUtils.stagingURI))
 
         val now = new java.util.Date().getTime
 
@@ -75,7 +77,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
         val stream = MetadataIngestionPipeline.filterAndParseEvents(config.bucketName, landingDf)
         stream.write
           .partitionBy("bucket")
-          .parquet(config.alluxioLandingPath)
+          .parquet(AlluxioUtils.landingURI)
 
 
         // TODO cache?
@@ -98,7 +100,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
         merger.mergePartition("bucket", "wednesday", 1)
 
         // then, landing should be empty
-        fs.listStatus(new Path(config.alluxioLandingPath, "bucket=wednesday"),
+        fs.listStatus(new Path(AlluxioUtils.landingURI, "bucket=wednesday"),
           SparkUtils.parquetFilesFilter).length shouldEqual 0
 
         // given we query again (hits staging)
@@ -114,6 +116,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
     "Scenario 3: not return entries in staging that are marked as deleted in landing" in withSparkContext {
       (spark, config) =>
 
+        implicit val _config = config
         implicit val _sparkSession : SparkSession = spark
         import _sparkSession.implicits._
 
@@ -134,14 +137,14 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
         stream.write
           .partitionBy("bucket")
           .mode(SaveMode.Overwrite)
-          .parquet(config.alluxioStagingPath)
+          .parquet(AlluxioUtils.stagingURI)
 
         val landingDf = landingData.toDF("timestamp", "value")
         stream = MetadataIngestionPipeline.filterAndParseEvents(config.bucketName, landingDf)
         stream.write
           .partitionBy("bucket")
           .mode(SaveMode.Overwrite)
-          .parquet(config.alluxioLandingPath)
+          .parquet(AlluxioUtils.landingURI)
 
         // TODO cache?
         val queryExecutor = MetadataQueryExecutor(spark, config)
@@ -162,7 +165,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
         // then, landing should be empty
         val fs = SparkUtils.buildHadoopFs(config)
-        fs.listStatus(new Path(config.alluxioLandingPath, "bucket=wednesday"), SparkUtils.parquetFilesFilter).length shouldEqual 0
+        fs.listStatus(new Path(AlluxioUtils.landingURI, "bucket=wednesday"), SparkUtils.parquetFilesFilter).length shouldEqual 0
 
         // given we query again (hits staging)
         result = queryExecutor.execute(query)
@@ -177,6 +180,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
     "Scenario 4: pagination works" in withSparkContext {
       (spark, config) =>
 
+        implicit val _config = config
         implicit val _sparkSession : SparkSession = spark
         import _sparkSession.implicits._
 
@@ -197,14 +201,14 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
         stream.write
           .partitionBy("bucket")
           .mode(SaveMode.Overwrite)
-          .parquet(config.alluxioStagingPath)
+          .parquet(AlluxioUtils.stagingURI)
 
         val landingDf = landingData.toDF("timestamp", "value")
         stream = MetadataIngestionPipeline.filterAndParseEvents(config.bucketName, landingDf)
         stream.write
           .partitionBy("bucket")
           .mode(SaveMode.Overwrite)
-          .parquet(config.alluxioLandingPath)
+          .parquet(AlluxioUtils.landingURI)
 
         // TODO cache?
         val queryExecutor = MetadataQueryExecutor(spark, config)
@@ -244,7 +248,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
         // then, landing should be empty
         val fs = SparkUtils.buildHadoopFs(config)
-        fs.listStatus(new Path(config.alluxioLandingPath, "bucket=wednesday"), SparkUtils.parquetFilesFilter).length shouldEqual 0
+        fs.listStatus(new Path(AlluxioUtils.landingURI, "bucket=wednesday"), SparkUtils.parquetFilesFilter).length shouldEqual 0
 
         // given we query again (hits staging)
         result = queryExecutor.execute(query)
@@ -260,6 +264,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
     "Scenario 5: queries with like '%' work" in withSparkContext {
       (spark, config) =>
 
+        implicit val _config = config
         implicit val _sparkSession : SparkSession = spark
         import _sparkSession.implicits._
 
@@ -280,14 +285,14 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
         stream.write
           .partitionBy("bucket")
           .mode(SaveMode.Overwrite)
-          .parquet(config.alluxioStagingPath)
+          .parquet(AlluxioUtils.stagingURI)
 
         val landingDf = landingData.toDF("timestamp", "value")
         stream = MetadataIngestionPipeline.filterAndParseEvents(config.bucketName, landingDf)
         stream.write
           .partitionBy("bucket")
           .mode(SaveMode.Overwrite)
-          .parquet(config.alluxioLandingPath)
+          .parquet(AlluxioUtils.landingURI)
 
         // TODO cache?
         val queryExecutor = MetadataQueryExecutor(spark, config)
@@ -332,7 +337,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
         // then, landing should be empty
         val fs = SparkUtils.buildHadoopFs(config)
-        fs.listStatus(new Path(config.alluxioLandingPath, "bucket=wednesday"), SparkUtils.parquetFilesFilter).length shouldEqual 0
+        fs.listStatus(new Path(AlluxioUtils.landingURI, "bucket=wednesday"), SparkUtils.parquetFilesFilter).length shouldEqual 0
 
         // given we query again (hits staging)
         result = queryExecutor.execute(query)
@@ -371,7 +376,7 @@ trait SparkContextSetup extends LazyLogging {
     val parsedConfig = ConfigFactory.parseFile(new File(getClass.getResource("/application.conf").getFile))
     val _config = ConfigFactory.load(parsedConfig)
 
-    val config = new CluesoConfig(_config)
+    implicit val config = new CluesoConfig(_config)
 
     // create bucket if doesn't exist – this requires AWS client
     createBucketIfNotExists(config)
@@ -389,8 +394,8 @@ trait SparkContextSetup extends LazyLogging {
 //      fs.create(bucketPath, true)
 //    }
 
-    fs.delete(new Path(config.alluxioLandingPath), true)
-    fs.delete(new Path(config.alluxioStagingPath), true)
+//    fs.delete(new Path(AlluxioUtils.landingURI), true)
+//    fs.delete(new Path(AlluxioUtils.stagingURI), true)
 
     try
       testMethod(spark, config)
