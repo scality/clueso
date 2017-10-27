@@ -384,13 +384,13 @@ trait SparkContextSetup extends LazyLogging {
     // create dirs
     val fs = SparkUtils.buildHadoopFs(config)
 
-    val bucketPath = new Path(s"s3a://${config.bucketName}")
-    if (!fs.exists(bucketPath)) {
-      fs.create(bucketPath, true)
-    }
+//    val bucketPath = new Path(s"s3a://${config.bucketName}")
+//    if (!fs.exists(bucketPath)) {
+//      fs.create(bucketPath, true)
+//    }
 
-    fs.delete(new Path(config.stagingPath), true)
-    fs.delete(new Path(config.landingPath), true)
+    fs.delete(new Path(config.alluxioLandingPath), true)
+    fs.delete(new Path(config.alluxioStagingPath  ), true)
 
     try
       testMethod(spark, config)

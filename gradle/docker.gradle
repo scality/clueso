@@ -18,6 +18,8 @@ buildscript {
 
 apply plugin: com.avast.gradle.dockercompose.DockerComposePlugin
 
+dockerCompose.isRequiredBy(test)
+
 dockerCompose {
 
 }
@@ -34,6 +36,7 @@ test.doFirst {
     // get information about container of service `web` (declared in docker-compose.yml)
 
 }
+
 
 // use fully qualified class name
 //apply plugin: com.bmuschko.gradle.docker.DockerRemoteApiPlugin
