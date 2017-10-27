@@ -1,0 +1,202 @@
+version: '3.1'
+services:
+  alluxio-master:
+#    image: scality/alluxio:latest
+    build: ./docker/images/alluxio/
+    ports:
+      - "19998:19998"
+      - "19999:19999"
+    environment:
+      ALLUXIO_UNDERFS_ADDRESS: s3a://METADATA/alluxio
+      #  testing for now. use swarm secrets?
+      AWS_ACCESS_KEY_ID: accessKey1
+      AWS_SECRET_ACCESS_KEY: verySecretKey1
+      ALLUXIO_MASTER_HOSTNAME: alluxio-master
+      ALLUXIO_UNDERFS_S3_ENDPOINT: http://lb
+      ALLUXIO_UNDERFS_S3A_LIST_OBJECTS_V1: "true"
+    volumes:
+      - ./src/test/docker/alluxio-site.properties:/opt/alluxio/conf/alluxio-site.properties
+      - ./src/test/docker/dot_aws:/root/.aws/
+    command:
+
+    entrypoint: /bin/bash
+    command: "/opt/alluxio/bin/create-s3-metadata-bucket.sh && /entrypoint.sh master 2>&1"
+    depends_on:
+      - lb
+
+  spark-master:
+    image: scality/spark-master:hadoop2.8
+    hostname: spark-master
+    depends_on:
+      - graphite
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+
+  spark-worker:
+    image: scality/spark-worker:hadoop2.8-alluxio
+    depends_on:
+      - spark-master
+      - graphite
+      - alluxio-master
+      - lb
+#    ports:
+#      - "8081:8081"
+     # - "30000"
+    volumes:
+      - alluxio-worker-vol:/dev/shm
+      - ./src/test/docker/alluxio-site.properties:/opt/alluxio/conf/alluxio-site.properties
+    environment:
+      SPARK_MASTER: spark://spark-master:7077
+      CLUSTER_DNS: spark-worker
+      INIT_REPLICATE: 1
+      ALLUXIO_UNDERFS_ADDRESS: s3a://METADATA/alluxio
+      #  testing for now. use swarm secrets?
+      AWS_ACCESS_KEY_ID: accessKey1
+      AWS_SECRET_KEY: verySecretKey1
+      ALLUXIO_MASTER_HOSTNAME: alluxio-master
+      ALLUXIO_UNDERFS_S3_ENDPOINT: http://lb
+      ALLUXIO_UNDERFS_S3A_LIST_OBJECTS_V1: "true"
+
+  graphite:
+    image: scality/grafana_graphite
+    ports:
+      - '9000:80'
+      - '9081:81'
+      - '8125:8125/udp'
+      - '8126:8126'
+      - '2003:2003'
+      - '2004:2004'
+      - '7002:7002'
+      - '3000:3000'
+#    expose:
+#      - "8000"
+    volumes:
+      - ./tmp/data/whisper:/opt/graphite/storage/whisper
+      - ./tmp/data/grafana:/opt/grafana/data
+      - ./tmp/log/graphite:/opt/graphite/storage/log
+
+
+  s3-data:
+#    image: scality/s3server
+    build: ./docker/images/S3/
+    ports:
+      - "9991:9991"
+    environment:
+      S3DATAPATH: /data
+      LISTEN_ADDR: 0.0.0.0
+    volumes:
+      - "s3-data:/data:rw"
+    command: npm run start_dataserver
+
+  s3-metadata:
+#    image: scality/s3server
+    build: ./docker/images/S3/
+    ports:
+      - "9990:9990"
+    environment:
+      S3METADATAPATH: /metadata
+      LISTEN_ADDR: 0.0.0.0
+      RECORDLOG_ENABLED: "true"
+    volumes:
+      - 's3-metadata:/metadata:rw'
+    command: npm run start_mdserver
+
+  cache:
+    image: redis:alpine
+    ports:
+      - "6379"
+
+  s3-front:
+#    image: scality/s3server
+    build: ./docker/images/S3/
+    ports:
+      - "8000"
+    environment:
+      DATA_HOST: s3-data
+      METADATA_HOST: s3-metadata
+      REDIS_HOST: cache
+      ENDPOINT: "localhost"
+      RECORDLOG_ENABLED: "true"
+    command: npm run start_s3server
+    depends_on:
+      - s3-data
+      - s3-metadata
+      - cache
+
+  lb:
+    image: zenko/loadbalancer
+    ports:
+      - "80:80"
+    environment:
+      LISTEN_PORT: 80
+      UPSTREAM_SERVER: "s3-front:8000"
+    depends_on:
+      - s3-front
+
+
+
+volumes:
+  s3-data:
+  s3-metadata:
+
+  alluxio-worker-vol:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+
+#  spark-master:
+#    image: scality/spark-master:hadoop2.8
+#    hostname: spark-master
+#    depends_on:
+#      - kafka
+#      - graphite
+#    ports:
+#      - "8080:8080"
+#      - "7077:7077"
+#    #environment:
+#    #  - INIT_DAEMON_STEP=setup_spark
+#    networks:
+#      - frontend
+#
+#
+#  spark-master:
+#    image: bde2020/spark-master:2.1.1-hadoop2.7
+#    container_name: spark-master
+#    depends_on:
+#      - kafka
+#    ports:
+#      - "8080:8080"
+#      - "7077:7077"
+#    environment:
+#      - INIT_DAEMON_STEP=setup_spark
+#
+#  spark-worker-1:
+#    image: bde2020/spark-worker:2.1.1-hadoop2.7
+#    container_name: spark-worker-1
+#    depends_on:
+#      - spark-master
+#      - kafka
+#    ports:
+#      - "8081:8081"
+#    environment:
+#      - "SPARK_MASTER=spark://spark-master:7077"
+#  spark-worker-2:
+#    image: bde2020/spark-worker:2.1.1-hadoop2.7
+#    container_name: spark-worker-2
+#    depends_on:
+#      - spark-master
+#      - kafka
+#    ports:
+#      - "8082:8081"
+#    environment:
+#      - "SPARK_MASTER=spark://spark-master:7077"
+#
+#  kafka:
+#    image: spotify/kafka
+#    ports:
+#      - "9092:9092"
+#      - "2181:2181"
+#    environment:
+#      - "ADVERTISED_HOST=kafka"
+#      - "ADVERTISED_PORT=9092"
