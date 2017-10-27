@@ -91,7 +91,8 @@ object SparkUtils {
       }
     }
 
-    resultArray}
+    resultArray
+  }
 
 
   val parquetFilesFilter = new PathFilter {

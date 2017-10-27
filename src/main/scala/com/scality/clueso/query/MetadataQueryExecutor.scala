@@ -174,11 +174,6 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
     var resultDf = eagerSearch(spark, config, bucketName, query.sqlWhereExpr)
 
-//    logger.info("EXPLAIN:")
-//    resultDf.explain(true)
-
-//    var resultDf = getBucketDataframe(bucketName)
-
     val sqlWhereExpr = query.sqlWhereExpr
     if (!sqlWhereExpr.isEmpty) {
       resultDf = resultDf.where(sqlWhereExpr)
@@ -187,11 +182,6 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
     if (query.start_key.isDefined) {
       resultDf = resultDf.where(col("key") > lit(query.start_key.get))
     }
-
-//    logger.info("EXPLAIN 2:")
-//    resultDf.explain(true)
-
-//    val currentWorkers = Math.max(currentActiveExecutors(spark.sparkContext).count(_ => true), 1)
 
     resultDf
       .select(CluesoConstants.resultCols: _*)
@@ -230,14 +220,13 @@ object MetadataQueryExecutor extends LazyLogging {
 
     // what does this do?
     // why not in Landing?
-    spark.catalog.refreshTable("staging")
+//    spark.catalog.refreshTable("staging")
 
     // read df
     // need to name somehow so alluxio caches bucket separately?
     val stagingTable = spark.table("staging")
       .where(col("bucket").eqNullSafe(bucketName))
       .select(cols: _*)
-    //      .orderBy("key")
 
     stagingTable
   }
@@ -319,12 +308,12 @@ object MetadataQueryExecutor extends LazyLogging {
 
     import SparkUtils.fillNonExistingColumns
 
-
     var result = landingTable.select(fillNonExistingColumns(colsLanding, unionCols):_*)
       .union(stagingTable.select(fillNonExistingColumns(colsStaging, unionCols):_*))
       .orderBy(col("key"))
       .withColumn("rank", row_number().over(windowSpec))
       .where(col("rank").lt(2).and(col("type") =!= "delete"))
+
 
     result
   }
