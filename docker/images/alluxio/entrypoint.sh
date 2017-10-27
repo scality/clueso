@@ -18,6 +18,7 @@ if [[ $# -ne 1 ]]; then
 fi
 
 service=$1
+echo "Running Alluxio $service"
 
 # Only set ALLUXIO_RAM_FOLDER if tiered storage isn't explicitly configured
 if [[ -z "${ALLUXIO_WORKER_TIEREDSTORE_LEVEL0_DIRS_PATH}" ]]; then
