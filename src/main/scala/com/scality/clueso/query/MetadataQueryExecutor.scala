@@ -66,11 +66,15 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
         if (!cacheComputationBeingExecuted(alluxioFs, bucketName)) {
 
-          val tmpDir = alluxioTempPath(Some(bucketName))
-          bucketDf.write.parquet(tmpDir.toUri.toString)
+          Future {
 
-          val tableView = alluxioCachePath(bucketName).toUri.toString
-          alluxioFs.rename(tmpDir, new Path(tableView))
+            val tmpDir = alluxioTempPath(Some(bucketName))
+
+            bucketDf.write.parquet(tmpDir.toUri.toString)
+
+            val tableView = alluxioCachePath(bucketName).toUri.toString
+            alluxioFs.rename(tmpDir, new Path(tableView))
+          }
         }
 
 
@@ -114,7 +118,7 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
         //  return most recent cached version (always)
         spark.read
-          .parquet(alluxioCachePath(bucketName).toString.toString)
+          .parquet(cachePath.get.toUri.toString)
       }
     }
   }

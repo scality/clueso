@@ -31,6 +31,7 @@ object AlluxioUtils extends LazyLogging {
       logger.info("No cache being computed.")
       false // no cache being computed
     } else {
+      logger.info("Cache being computed...")
       val latestCachePath = getLatestCachePath(alluxioFs, bucketName)
       // there are computations... pick up the max timestamp
       val maxTs = status.map { status =>
@@ -70,10 +71,18 @@ object AlluxioUtils extends LazyLogging {
     if (status.isEmpty) {
       None
     } else {
-      val maxTs = status.map { status =>
+      val maxTs = status.flatMap { status =>
+        logger.debug(s"Detected cache = ${status.getPath.getName}")
         val m = pattern.matcher(status.getPath.getName)
-        (m.group(0).toLong, status.getPath)
+
+        if (m.matches()) {
+          Some((m.group(1), status.getPath))
+        } else {
+          None
+        }
       } maxBy (_._1)
+
+      logger.debug(s"Last cache = ${maxTs._2}")
       Some(maxTs._2)
     }
   }
