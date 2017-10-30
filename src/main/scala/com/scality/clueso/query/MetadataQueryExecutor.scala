@@ -168,10 +168,16 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
     val currentWorkers = Math.max(currentActiveExecutors(spark.sparkContext).count(_ => true), 1)
 
-    resultDf
+    val result = resultDf
       .select(CluesoConstants.resultCols: _*)
       .orderBy(col("key"))
       .limit(query.limit)
+
+    logger.info("Explain Query:")
+    result.explain(true)
+    logger.info("End Explain Query")
+
+    result
   }
 }
 
