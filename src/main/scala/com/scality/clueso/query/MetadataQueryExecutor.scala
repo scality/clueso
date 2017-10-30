@@ -12,9 +12,9 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkContext
 import org.apache.spark.clueso.metrics.SearchMetricsSource
+import org.apache.spark.sql._
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{col, _}
-import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
@@ -167,6 +167,7 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
     println("[" +  resultArray.mkString(",") + "]")
   }
 
+
   def execute(query : MetadataQuery) = {
     val bucketName = query.bucketName
 
@@ -183,10 +184,16 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
       resultDf = resultDf.where(col("key") > lit(query.start_key.get))
     }
 
-    resultDf
+    val result = resultDf
       .select(CluesoConstants.resultCols: _*)
       .orderBy(col("key"))
       .limit(query.limit)
+
+    logger.info("Explain Query:")
+    ExplainLogger.explain(spark, result)
+    logger.info("End Explain Query")
+
+    result
   }
 }
 
@@ -310,7 +317,6 @@ object MetadataQueryExecutor extends LazyLogging {
 
     var result = landingTable.select(fillNonExistingColumns(colsLanding, unionCols):_*)
       .union(stagingTable.select(fillNonExistingColumns(colsStaging, unionCols):_*))
-      .orderBy(col("key"))
       .withColumn("rank", row_number().over(windowSpec))
       .where(col("rank").lt(2).and(col("type") =!= "delete"))
 
