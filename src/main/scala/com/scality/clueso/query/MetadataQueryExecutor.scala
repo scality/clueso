@@ -47,46 +47,23 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
   sys.addShutdownHook {
     metricsRegisterCancel.set(true)
-    lockedBucketName.map(releaseLock)
     alluxioFs.close()
   }
 
 
-
-  def acquireLock(bucketName : String) = synchronized {
-    val res = AlluxioUtils.acquireLock(alluxioFs, bucketName)
-
-
-    if (res) {
-      lockedBucketName = Some(bucketName)
-    }
-
-    res
-  }
-
-  def releaseLock(bucketName : String) = synchronized {
-    deleteLockFile(alluxioFs, bucketName)
-    lockedBucketName = None
-  }
-
-
-
   def getBucketDataframe(bucketName : String) : DataFrame = {
     if (!config.cacheDataframes) {
+      logger.info("Cache is off.")
       setupDf(spark, config, bucketName)
     } else {
       // check if cache doesn't exist
-
-      //      val cachePath = alluxioCachePath(bucketName)
-
       val cachePath : Option[Path] = getLatestCachePath(alluxioFs, bucketName)
 
-      //      if (!bucketDfs.contains(bucketName)) {
-      //      if (!alluxioFs.exists(cachePath)) {
       if (cachePath.isEmpty) {
+        logger.info("Cache is empty")
         val bucketDf = setupDf(spark, config, bucketName)
 
-        //        if (acquireLock(bucketName)) {
+
         if (!cacheComputationBeingExecuted(alluxioFs, bucketName)) {
 
           val tmpDir = alluxioTempPath(Some(bucketName))
@@ -96,14 +73,16 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
           alluxioFs.rename(tmpDir, new Path(tableView))
         }
 
+
         bucketDf
       } else {
+        logger.info(s"Cache exists: ${cachePath.get}")
         // cache exists
 
         // grab timestamp of _SUCCESS
         val fileStatus = alluxioFs.getFileStatus(new Path(cachePath.get, "_SUCCESS"))
         val now = new Date().getTime
-        logger.info(s"Cache timestamp = ${fileStatus.getModificationTime} ( now = $now )")
+        logger.info(s"Cache timestamp = ${fileStatus.getModificationTime} ( now = $now )  threshold = ${config.mergeFrequency.toMillis} ms")
 
         if (fileStatus.getModificationTime + config.mergeFrequency.toMillis < now) {
           // check if there's a dataframe update going on

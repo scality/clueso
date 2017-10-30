@@ -7,24 +7,8 @@ import org.apache.hadoop.fs.{FileSystem, Path, PathFilter}
 
 object AlluxioUtils extends LazyLogging {
 
-  def deleteLockFile(alluxioFs: FileSystem, bucketName: String)(implicit config: CluesoConfig) = {
-    alluxioFs.delete(alluxioLockPath(bucketName), false)
-  }
-
-  def acquireLock(alluxioFs: FileSystem, bucketName: String)(implicit config: CluesoConfig) = synchronized {
-    // TODO race condition on alluxio?
-    if (!alluxioFs.exists(alluxioLockPath(bucketName))) {
-      alluxioFs.create(alluxioLockPath(bucketName), false)
-      true
-    } else
-      false
-  }
-
-  def alluxioLockPath(bucketName: String)(implicit config: CluesoConfig) =
-    new Path(s"${config.alluxioUrl}/lock_$bucketName")
-
   def alluxioCachePath(bucketName: String)(implicit config: CluesoConfig) =
-    new Path(s"${config.alluxioUrl}/bucket_$bucketName")
+    new Path(s"${config.alluxioUrl}/${new Date().getTime}_bucket_$bucketName")
 
   def alluxioTempPath(bucketName: Option[String])(implicit config: CluesoConfig) =
     new Path(s"${config.alluxioUrl}/tmp_${new Date().getTime}_${bucketName.getOrElse("")}")
@@ -65,6 +49,7 @@ object AlluxioUtils extends LazyLogging {
           .group(0)
           .toLong
         // is being computer if computation ts > most recent cache ts
+        logger.info("Comparing cache timestamps.")
         cacheTs < maxTs._1
       }
     }
