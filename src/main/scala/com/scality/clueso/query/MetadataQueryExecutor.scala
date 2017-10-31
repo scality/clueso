@@ -189,9 +189,9 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
       .orderBy(col("key"))
       .limit(query.limit)
 
-    logger.info("Explain Query:")
-    ExplainLogger.explain(spark, result)
-    logger.info("End Explain Query")
+//    logger.info("Explain Query:")
+//    ExplainLogger.explain(spark, result)
+//    logger.info("End Explain Query")
 
     result
   }
@@ -319,7 +319,6 @@ object MetadataQueryExecutor extends LazyLogging {
       .union(stagingTable.select(fillNonExistingColumns(colsStaging, unionCols):_*))
       .withColumn("rank", row_number().over(windowSpec))
       .where(col("rank").lt(2).and(col("type") =!= "delete"))
-
 
     result
   }
