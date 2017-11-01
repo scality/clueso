@@ -295,15 +295,15 @@ object MetadataQueryExecutor extends LazyLogging {
       stagingTable = stagingTable.where(sqlWhereExpr)
     }
 
-    if (currentWorkers > 0) {
-      stagingTable = stagingTable.repartition(currentWorkers)
-    }
+//    if (currentWorkers > 0) {
+//      stagingTable = stagingTable.repartition(currentWorkers)
+//    }
 
     var landingTable = selectColumns(getColdLandingTable(spark, config, bucketName))
 
-    if (currentWorkers > 0) {
-      landingTable = landingTable.repartition(currentWorkers)
-    }
+//    if (currentWorkers > 0) {
+//      landingTable = landingTable.repartition(currentWorkers)
+//    }
 
     val colsLanding = landingTable.columns.toSet
     //    val colsLanding = landingTable.schema.fields.map(_.name).toSet
