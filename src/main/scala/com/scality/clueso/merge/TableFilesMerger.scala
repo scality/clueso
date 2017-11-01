@@ -94,6 +94,7 @@ class TableFilesMerger(spark : SparkSession, implicit val config: CluesoConfig) 
 
   def writeMergedData(mergedData: Dataset[Row], outputPath: String) = {
     mergedData.write
+//      .option("compression","none")
 //      .mode(SaveMode.Overwrite)
       .parquet(outputPath)
   }
@@ -156,7 +157,6 @@ class TableFilesMerger(spark : SparkSession, implicit val config: CluesoConfig) 
 
         replaceStagingWithMerged(stagingPartitionPath, outputPath)
 
-//        deleteMetadataDir(config.landingPath)
         deleteMetadataDir(AlluxioUtils.landingURI)
 
         // TODO wait a bit before removing..
