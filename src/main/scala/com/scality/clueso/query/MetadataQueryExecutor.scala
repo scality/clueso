@@ -3,13 +3,13 @@ package com.scality.clueso.query
 import java.net.URI
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.{Date, concurrent => juc}
+import java.util.{concurrent => juc}
 
-import com.scality.clueso.AlluxioUtils._
 import com.scality.clueso.SparkUtils._
+import com.scality.clueso.query.cache.{AlluxioCacheManager, SessionCacheManager}
 import com.scality.clueso.{AlluxioUtils, CluesoConfig, CluesoConstants, SparkUtils}
 import com.typesafe.scalalogging.LazyLogging
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.FileSystem
 import org.apache.spark.SparkContext
 import org.apache.spark.clueso.metrics.SearchMetricsSource
 import org.apache.spark.sql.expressions.Window
@@ -56,69 +56,11 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
       logger.info("Cache is off.")
       setupDf(spark, config, bucketName)
     } else {
-      // check if cache doesn't exist
-      val cachePath : Option[Path] = getLatestCachePath(alluxioFs, bucketName)
-
-      if (cachePath.isEmpty) {
-        logger.info("Cache is empty")
-        val bucketDf = setupDf(spark, config, bucketName)
-
-
-        if (!cacheComputationBeingExecuted(alluxioFs, bucketName)) {
-
-          Future {
-
-            val tmpDir = alluxioTempPath(Some(bucketName))
-
-            bucketDf.write.parquet(tmpDir.toUri.toString)
-
-            val tableView = alluxioCachePath(bucketName).toUri.toString
-            alluxioFs.rename(tmpDir, new Path(tableView))
-          }
-        }
-
-
-        bucketDf
+      // delegate to cache manager
+      if (config.useAlluxio) {
+        AlluxioCacheManager.getCachedBucketDataframe(spark, bucketName, alluxioFs)
       } else {
-        logger.info(s"Cache exists: ${cachePath.get}")
-        // cache exists
-
-        // grab timestamp of _SUCCESS
-        val fileStatus = alluxioFs.getFileStatus(new Path(cachePath.get, "_SUCCESS"))
-        val now = new Date().getTime
-        logger.info(s"Cache timestamp = ${fileStatus.getModificationTime} ( now = $now )  threshold = ${config.mergeFrequency.toMillis} ms")
-
-        if (fileStatus.getModificationTime + config.mergeFrequency.toMillis < now) {
-          // check if there's a dataframe update going on
-          if (!cacheComputationBeingExecuted(alluxioFs, bucketName)) {
-
-            val randomTempPath = alluxioTempPath(Some(bucketName)).toUri.toString
-
-            // async update dataframe if there's none already doing it
-            Future {
-              logger.info(s"Calculating view $randomTempPath")
-              setupDf(spark, config, bucketName)
-            } map { bucketDf =>
-              logger.info(s"Calculating view $randomTempPath")
-
-              // write it to Alluxio with a random viewName
-              bucketDf.write.parquet(randomTempPath)
-
-              val tableView = alluxioCachePath(bucketName).toUri.toString
-              logger.info(s"Atomically swapping RDD for bucket = $bucketName ( new = tableView , old = $randomTempPath)")
-              // once finished, swap atomically with existing bucket
-              alluxioFs.rename(new Path(randomTempPath), new Path(tableView))
-
-              // sleep before the cleanup
-              Thread.sleep(config.cleanPastCacheDelay.toMillis) // TODO make configurable
-              cleanPastCaches(alluxioFs, bucketName)
-            }
-          }
-        }
-
-        //  return most recent cached version (always)
-        spark.read
-          .parquet(cachePath.get.toUri.toString)
+        SessionCacheManager.getCachedBucketDataframe(spark, bucketName)
       }
     }
   }
@@ -173,9 +115,9 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
       .orderBy(col("key"))
       .limit(query.limit)
 
-    logger.info("Explain Query:")
-    result.explain(true)
-    logger.info("End Explain Query")
+//    logger.info("Explain Query:")
+//    result.explain(true)
+//    logger.info("End Explain Query")
 
     result
   }
@@ -202,8 +144,8 @@ object MetadataQueryExecutor extends LazyLogging {
     col("message"))
 
   def getColdStagingTable(spark : SparkSession, config : CluesoConfig, bucketName : String) = {
-    logger.debug("in get cold staging table!!")
-    logger.debug("uri!!", AlluxioUtils.stagingURI(config))
+    logger.info(s"Reading cold staging table ${AlluxioUtils.stagingURI(config)}")
+
     val _stagingTable = spark.read
       .schema(CluesoConstants.storedEventSchema)
       .parquet(AlluxioUtils.stagingURI(config))
@@ -218,14 +160,13 @@ object MetadataQueryExecutor extends LazyLogging {
     val stagingTable = spark.table("staging")
       .where(col("bucket").eqNullSafe(bucketName))
       .select(cols: _*)
-    //      .orderBy("key")
 
     stagingTable
   }
 
   def getColdLandingTable(spark : SparkSession, config : CluesoConfig, bucketName : String) = {
-    logger.debug("in get coldLanding table!!")
-    logger.debug("uri!!", AlluxioUtils.landingURI(config))
+    logger.info(s"Reading cold landing table ${AlluxioUtils.stagingURI(config)}")
+
     val _landingTable = spark.read
       .schema(CluesoConstants.storedEventSchema)
       .parquet(AlluxioUtils.landingURI(config))
@@ -235,7 +176,7 @@ object MetadataQueryExecutor extends LazyLogging {
     var landingTable = spark.table("landing")
       .where(col("bucket").eqNullSafe(bucketName))
       .select(cols: _*)
-    //      .orderBy("key")
+
     landingTable
   }
 
@@ -247,19 +188,9 @@ object MetadataQueryExecutor extends LazyLogging {
 
     // read df
     var stagingTable = getColdStagingTable(spark, config, bucketName)
-
-    if (currentWorkers > 0) {
-      stagingTable = stagingTable.repartition(currentWorkers)
-    }
-
     var landingTable = getColdLandingTable(spark, config, bucketName)
 
-    if (currentWorkers > 0) {
-      landingTable = landingTable.repartition(currentWorkers)
-    }
-
     val colsLanding = landingTable.columns.toSet
-    //    val colsLanding = landingTable.schema.fields.map(_.name).toSet
     val colsStaging = stagingTable.columns.toSet
     val unionCols = colsLanding ++ colsStaging
 
@@ -268,10 +199,8 @@ object MetadataQueryExecutor extends LazyLogging {
 
     import SparkUtils.fillNonExistingColumns
 
-
     var result = landingTable.select(fillNonExistingColumns(colsLanding, unionCols):_*)
       .union(stagingTable.select(fillNonExistingColumns(colsStaging, unionCols):_*))
-      .orderBy(col("key"))
       .withColumn("rank", row_number().over(windowSpec))
       .where(col("rank").lt(2).and(col("type") =!= "delete"))
       .select(col("bucket"),

@@ -7,8 +7,8 @@ import com.scality.clueso.query.{MetadataQuery, MetadataQueryExecutor}
 import com.typesafe.config.ConfigFactory
 import org.apache.hadoop.conf.{Configuration => HadoopConfig}
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, lit}
+import org.apache.spark.sql.{Row, SparkSession}
 
 
 object SparkUtils {
@@ -68,16 +68,34 @@ object SparkUtils {
     spark.conf.set("fs.alluxio.impl", "alluxio.hadoop.FileSystem")
   }
 
+  import scala.util.parsing.json.JSONObject
+
+  def convertRowToJSON(row: Row): String = {
+    val m = row.getValuesMap(row.schema.fieldNames)
+    JSONObject(m).toString().replaceAll("`","")
+  }
+
   def getQueryResults(spark : SparkSession, queryExecutor: MetadataQueryExecutor, query : MetadataQuery) = {
     val result = queryExecutor.execute(query)
 
     val resultArray = try {
+//      val results = result.take(query.limit)
+
       val jsonResults = result.toJSON.take(query.limit)
       if (jsonResults.size > 0) {
         jsonResults.map(_.replaceAll("`",""))
       } else {
         Array[String]()
       }
+
+//      if (results.nonEmpty) {
+//        results.map(row => {
+//          convertRowToJSON(row)
+//        })
+//      } else {
+//        Array[String]()
+//      }
+
     } catch {
       case e:IOException => {
         println(e)

@@ -110,13 +110,13 @@ object AlluxioUtils extends LazyLogging {
   // alluxio settings set out here: http://www.alluxio.org/docs/master/en/Configuration-Properties.html
   // appears default cache is 1 hour? change to 60 seconds to match merge frequency?
   def landingURI(implicit config: CluesoConfig): String = {
-    if (!config.cacheDataframes) {
+    if (!config.useAlluxio) {
       config.landingPath
     } else s"${config.alluxioUrl}${config.alluxioLandingPath}"
   }
 
   def stagingURI(implicit config: CluesoConfig): String = {
-    if (!config.cacheDataframes) {
+    if (!config.useAlluxio) {
       config.stagingPath
     } else s"${config.alluxioUrl}${config.alluxioStagingPath}"
   }
