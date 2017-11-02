@@ -37,7 +37,7 @@
     fi
   done
 
-  echo "alluxio.worker.bind.host=$(hostname)" >> conf/alluxio-site.properties
+  echo "alluxio.worker.bind.host=$(awk 'END{print $1}' /etc/hosts)" >> conf/alluxio-site.properties
 
   bin/alluxio formatWorker
   bin/alluxio-worker.sh &
