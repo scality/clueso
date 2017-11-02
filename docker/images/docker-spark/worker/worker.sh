@@ -37,6 +37,8 @@
     fi
   done
 
+  echo "alluxio.worker.bind.host=$(hostname)" >> conf/alluxio-site.properties
+
   bin/alluxio formatWorker
   bin/alluxio-worker.sh &
 
@@ -49,4 +51,3 @@
 
   /spark/sbin/../bin/spark-class org.apache.spark.deploy.worker.Worker \
     --webui-port $SPARK_WORKER_WEBUI_PORT $SPARK_MASTER >> $SPARK_WORKER_LOG/spark-worker.out
-
