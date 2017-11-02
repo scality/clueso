@@ -38,12 +38,12 @@ object AlluxioUtils extends LazyLogging {
         val m = pattern.matcher(status.getPath.getName)
 
         if (m.matches()) {
-          Some((m.group(0).toLong, status.getPath))
+          Some((m.group(0), status.getPath))
         } else {
           None
         }
-
       } maxBy (_._1)
+
       // get last cached view
       val cachePattern = cacheLocationRegex(bucketName)
       if (latestCachePath.isEmpty) {
@@ -52,9 +52,14 @@ object AlluxioUtils extends LazyLogging {
         true
       } else {
         // check if cache is more recent than detected computation (may be pending for deletion)
-        val cacheTs = cachePattern.matcher(latestCachePath.get.getName)
-          .group(0)
-          .toLong
+        val cacheTs = {
+          val m = cachePattern.matcher(latestCachePath.get.getName)
+          if (m.matches()) {
+            m.group(0)
+          } else {
+            ""
+          }
+        }
         // is being computer if computation ts > most recent cache ts
         logger.info("Comparing cache timestamps.")
         cacheTs < maxTs._1

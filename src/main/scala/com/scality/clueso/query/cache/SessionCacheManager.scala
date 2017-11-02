@@ -1,5 +1,6 @@
 package com.scality.clueso.query.cache
 
+import java.util.Date
 import java.util.concurrent.atomic.AtomicReference
 
 import com.scality.clueso.CluesoConfig
@@ -19,7 +20,7 @@ object SessionCacheManager extends LazyLogging {
 
   def getCachedBucketDataframe(spark: SparkSession, bucketName: String)(implicit config: CluesoConfig): DataFrame = {
     // check if cache doesn't exist
-    val tableView = s"${(Math.random()*100).toInt}_$bucketName"
+    val tableView = s"${new Date().getTime}_$bucketName"
 
     if (!bucketDfs.contains(bucketName)) {
       val bucketDf = setupDf(spark, config, bucketName)
