@@ -69,6 +69,8 @@ object SparkUtils extends LazyLogging {
   def confAlluxioReads(spark : SparkSession, config : CluesoConfig) = {
     logger.debug("Configuring Alluxio Client for CACHE_PROMOTE reads")
     spark.conf.set("alluxio.user.file.readtype.default", "CACHE_PROMOTE")
+//    spark.conf.set("alluxio.user.file.cache.partially.read.block", "false")
+//    spark.conf.set("alluxio.user.file.passive.cache.enabled", "false")
   }
 
   def confSparkSession(spark : SparkSession, config : CluesoConfig) = {
