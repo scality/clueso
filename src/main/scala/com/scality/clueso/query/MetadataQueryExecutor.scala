@@ -172,7 +172,7 @@ object MetadataQueryExecutor extends LazyLogging {
   }
 
   def getColdLandingTable(spark : SparkSession, config : CluesoConfig, bucketName : String) = {
-    logger.info(s"Reading cold landing table ${AlluxioUtils.stagingURI(config)}")
+    logger.info(s"Reading cold landing table ${AlluxioUtils.landingURI(config)}")
 
     val _landingTable = spark.read
       .schema(CluesoConstants.storedEventSchema)
