@@ -77,7 +77,17 @@ object AlluxioUtils extends LazyLogging {
   def getLatestCachePath(alluxioFs: FileSystem, bucketName: String)(implicit config: CluesoConfig) = {
     val pattern = cacheLocationRegex(bucketName)
     val status = alluxioFs.listStatus(new Path(config.alluxioUrl), new PathFilter {
-      override def accept(path: Path): Boolean = pattern.matcher(path.getName).matches()
+      override def accept(path: Path): Boolean = {
+        logger.debug(s"Filtering cache ${path.toUri.toString}")
+        if (pattern.matcher(path.getName).matches()) {
+          // check if it has _SUCCESS
+          val exists = alluxioFs.exists(new Path(path, "_SUCCESS"))
+          logger.debug(s"Filtering cache ${path.toUri.toString} -- _SUCCESS exists")
+          exists
+        } else {
+          false
+        }
+      }
     })
     if (status.isEmpty) {
       None
@@ -106,7 +116,7 @@ object AlluxioUtils extends LazyLogging {
       // pick oldest
       val oldest = paths.map { status =>
         val m = pattern.matcher(status.getPath.getName)
-        (m.group(0).toLong, status.getPath)
+        (m.group(0), status.getPath)
       } maxBy (_._1)
       try {
         alluxioFs.delete(oldest._2, true)
@@ -121,13 +131,13 @@ object AlluxioUtils extends LazyLogging {
   // alluxio settings set out here: http://www.alluxio.org/docs/master/en/Configuration-Properties.html
   // appears default cache is 1 hour? change to 60 seconds to match merge frequency?
   def landingURI(implicit config: CluesoConfig): String = {
-    if (!config.useAlluxio) {
+    if (!config.readViaAlluxio) {
       config.landingPath
     } else s"${config.alluxioUrl}${config.alluxioLandingPath}"
   }
 
   def stagingURI(implicit config: CluesoConfig): String = {
-    if (!config.useAlluxio) {
+    if (!config.readViaAlluxio) {
       config.stagingPath
     } else s"${config.alluxioUrl}${config.alluxioStagingPath}"
   }

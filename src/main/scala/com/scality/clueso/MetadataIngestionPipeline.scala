@@ -92,7 +92,6 @@ object MetadataIngestionPipeline extends LazyLogging {
       .format("parquet")
       .partitionBy("bucket")
       .outputMode(OutputMode.Append())
-//      .option("path", config.landingPath)
       .option("path", AlluxioUtils.landingURI)
       .start()
 

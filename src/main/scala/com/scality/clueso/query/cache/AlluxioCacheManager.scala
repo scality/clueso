@@ -53,6 +53,7 @@ object AlluxioCacheManager extends LazyLogging {
           val randomTempPath = alluxioTempPath(Some(bucketName)).toUri.toString
 
           // async update dataframe if there's none already doing it
+          import scala.concurrent.ExecutionContext.Implicits.global
           Future {
             logger.info(s"Calculating view $randomTempPath")
             setupDf(spark, config, bucketName)

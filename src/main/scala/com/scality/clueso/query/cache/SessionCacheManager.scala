@@ -82,12 +82,16 @@ object SessionCacheManager extends LazyLogging {
 
   def acquireLock(bucketName : String) = synchronized {
     if (!setupDfLock.contains(bucketName)) {
+      logger.info(s"Acquiring lock for bucket = ${bucketName}")
       setupDfLock += bucketName
       true
     } else
       false
   }
 
-  def releaseLock(bucketName : String) = synchronized { setupDfLock -= bucketName }
+  def releaseLock(bucketName : String) = synchronized {
+    logger.info(s"Releasing lock for bucket = ${bucketName}")
+    setupDfLock -= bucketName
+  }
 
 }

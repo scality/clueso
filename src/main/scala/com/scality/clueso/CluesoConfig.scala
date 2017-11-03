@@ -39,7 +39,8 @@ class CluesoConfig(config: Config) {
   val kafkaBootstrapServers = config.getString("kafka_bootstrap_servers")
   val kafkaTopic = config.getString("kafka_topic")
 
-  val useAlluxio = config.getBoolean("use_alluxio")
+  val readViaAlluxio = config.getBoolean("read_via_alluxio")
+  val cacheInAlluxio = config.getBoolean("cache_in_alluxio")
   val cacheDataframes = config.hasPath("cache_dataframes") && config.getBoolean("cache_dataframes")
 
   val graphiteHost = config.getString("graphite.hostname")

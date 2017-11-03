@@ -57,7 +57,7 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
       setupDf(spark, config, bucketName)
     } else {
       // delegate to cache manager
-      if (config.useAlluxio) {
+      if (config.cacheInAlluxio) {
         AlluxioCacheManager.getCachedBucketDataframe(spark, bucketName, alluxioFs)
       } else {
         SessionCacheManager.getCachedBucketDataframe(spark, bucketName)
