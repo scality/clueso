@@ -73,6 +73,8 @@ object MetadataIngestionPipeline extends LazyLogging {
       .appName("Metadata Ingestion Pipeline")
       .getOrCreate()
 
+    SparkUtils.confAlluxioCacheThruWrites(spark, config)
+
     val mergerService = new MergeService(spark, config)
 
     val eventStream = spark.readStream

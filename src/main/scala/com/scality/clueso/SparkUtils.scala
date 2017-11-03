@@ -5,13 +5,14 @@ import java.net.URI
 
 import com.scality.clueso.query.{MetadataQuery, MetadataQueryExecutor}
 import com.typesafe.config.ConfigFactory
+import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.conf.{Configuration => HadoopConfig}
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, PathFilter}
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.{Row, SparkSession}
 
 
-object SparkUtils {
+object SparkUtils extends LazyLogging {
   def loadCluesoConfig(confFilePath: String) = {
     val parsedConfig = ConfigFactory.parseFile(new File(confFilePath))
     val _config = ConfigFactory.load(parsedConfig)
@@ -53,6 +54,23 @@ object SparkUtils {
 
   }
 
+  def confAlluxioCacheThruWrites(spark : SparkSession, config : CluesoConfig) = {
+    logger.debug("Configuring Alluxio Client for CACHE_THROUGH writes")
+    spark.conf.set("alluxio.user.file.writetype.default", "CACHE_THROUGH")
+    spark.conf.set("alluxio.user.block.size.bytes.default", "16MB")
+  }
+
+  def confAlluxioCache(spark : SparkSession, config : CluesoConfig) = {
+    logger.debug("Configuring Alluxio Client for MUST_CACHE writes")
+    spark.conf.set("alluxio.user.file.writetype.default", "MUST_CACHE")
+    spark.conf.set("alluxio.user.block.size.bytes.default", "16MB")
+  }
+
+  def confAlluxioReads(spark : SparkSession, config : CluesoConfig) = {
+    logger.debug("Configuring Alluxio Client for CACHE_PROMOTE reads")
+    spark.conf.set("alluxio.user.file.readtype.default", "CACHE_PROMOTE")
+  }
+
   def confSparkSession(spark : SparkSession, config : CluesoConfig) = {
     spark.conf.set("spark.sql.parquet.cacheMetadata", "false")
     spark.conf.set("spark.hadoop.fs.s3a.fast.upload", "true")
@@ -66,6 +84,7 @@ object SparkUtils {
     spark.conf.set("fs.s3a.path.style.access", config.s3PathStyleAccess)
     spark.conf.set("spark.sql.streaming.metricsEnabled", "true")
     spark.conf.set("fs.alluxio.impl", "alluxio.hadoop.FileSystem")
+
   }
 
   import scala.util.parsing.json.JSONObject

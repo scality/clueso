@@ -39,15 +39,23 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
       // TODO change to config?
       Thread.sleep(5000)
 
-      logger.info("Registering new metrics")
+//      logger.info("Registering new metrics")
       SearchMetricsSource.registerRddMetrics(spark)
-      logger.info("Done")
+//      logger.info("Done")
     }
   }
 
   sys.addShutdownHook {
     metricsRegisterCancel.set(true)
     alluxioFs.close()
+  }
+
+  if (config.cacheInAlluxio) {
+    confAlluxioCache(spark, config)
+  }
+
+  if (config.readViaAlluxio) {
+    confAlluxioReads(spark, config)
   }
 
 

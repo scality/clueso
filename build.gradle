@@ -98,6 +98,8 @@ shadowJar {
             it.moduleGroup == 'org.scala-lang'
         })
 
+        exclude('alluxio-site.properties')
+
         exclude(dependency {
             it.moduleGroup == 'org.apache.spark' && !it.moduleName.startsWith('spark-sql-kafka-')
         })
@@ -115,6 +117,7 @@ task toolShadowJar(type: com.github.jengelman.gradle.plugins.shadow.tasks.Shadow
 
     exclude('META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA')
     exclude('metrics.properties')
+    exclude('alluxio-site.properties')
 
     zip64 true
 }
