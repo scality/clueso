@@ -29,7 +29,6 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
   var lockedBucketName : Option[String] = None
   val alluxioFs = FileSystem.get(new URI(s"${config.alluxioUrl}/"), hadoopConfig(config))
 
-
   SearchMetricsSource(spark, config)
 
   val metricsRegisterCancel = new AtomicBoolean(false)
