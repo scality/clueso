@@ -122,7 +122,8 @@ object SparkUtils extends LazyLogging {
       }
     }
 
-    resultArray}
+    resultArray
+  }
 
 
   val parquetFilesFilter = new PathFilter {

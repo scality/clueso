@@ -1,6 +1,7 @@
 package com.scality.clueso.tools
 
 import java.io.File
+import java.sql.Timestamp
 import java.util.{Date, UUID}
 
 import com.scality.clueso.{CluesoConfig, CluesoConstants, SparkUtils}
@@ -33,9 +34,9 @@ object LandingMetadataPopulatorTool extends LazyLogging {
 
     val fs = SparkUtils.buildHadoopFs(config)
 
-    val landing_path = s"s3a://${config.bucketName}/landing/bucket=$bucketName"
+    val landing_path = s"s3a://${config.bucketName}/alluxio/landing/bucket=$bucketName"
 
-    if (fs.exists(new Path(landing_path))) {
+    if (fs.exists(new Path(s"${landing_path}/"))) {
       logger.info(s"Deleting landing path: ${landing_path}")
       fs.delete(new Path(landing_path), true)
     }
@@ -51,16 +52,17 @@ object LandingMetadataPopulatorTool extends LazyLogging {
       (1 to numRecords).map { recordNo =>
         val key = s"landing-test-${UUID.randomUUID()}"
         val food = if (Random.nextBoolean()) { "pizza" } else { "pasta" }
-        val userMd = Map("x-amz-meta-food" -> food, "x-amz-meta-random" -> Random.nextInt(10))
-//        val eventType = if (Random.nextBoolean()) { "delete" } else { "put" }
+        val userMd = Map("x-amz-meta-food" -> food, "x-amz-meta-random" -> Random.nextInt(10).toString)
+
+        //        val eventType = if (Random.nextBoolean()) { "delete" } else { "put" }
         val eventType = "put"
 
         val message = new GenericRowWithSchema(Array(
           userMd, bucketName, "", key, key,
-          Row(Array("private", Array[String](), Array[String](), Array[String](), Array[String]()), CluesoConstants.eventAclSchema),
+          new GenericRowWithSchema(Array("private", Array[String](), Array[String](), Array[String](), Array[String]()), CluesoConstants.eventAclSchema),
           Array(), // locations
           Map[String, String](), // tags
-          Row(Array("", Array[String](), "", "", ""), CluesoConstants.replicationInfoSchema), // replicationInfo
+          new GenericRowWithSchema(Array("", Array[String](), "", "", ""), CluesoConstants.replicationInfoSchema), // replicationInfo
           1, // md-model-version
           "", // owner-display-name", StringType)
           "", // owner-id", StringType)
@@ -78,7 +80,7 @@ object LandingMetadataPopulatorTool extends LazyLogging {
           "" // x-amz-version-id
         ), CluesoConstants.eventValueSchema)
 
-        val kafkaTimestamp = new java.sql.Date(new Date().getTime)
+        val kafkaTimestamp = new Timestamp(new Date().getTime)
         val values : Array[Any] = Array(bucketName, key, kafkaTimestamp, eventType, message)
 
         new GenericRowWithSchema(values, CluesoConstants.storedEventSchema).asInstanceOf[Row]
