@@ -2,14 +2,11 @@ FROM java:openjdk-8-jdk
 MAINTAINER Vianney Rancurel <vr@scality.com>
 
 ENV HADOOP_VERSION 2.8.1
-ENV SPARK_VERSION 2.1.1_2.11
 ENV SPARK_BRANCH 2.1.1 
+ENV SPARK_HOME /spark/
+ENV SPARK_VERSION 2.1.1_2.11
 
 COPY conf /spark/conf/ 
-COPY wait-for-step.sh /
-COPY execute-step.sh /
-COPY finish-step.sh /
-COPY entrypoint.sh /usr/local/bin/
 
 RUN apt-get update \
     && apt-get install -y supervisor curl build-essential \
@@ -32,7 +29,6 @@ RUN mkdir -p /apps/build/ && \
 
 RUN cd /apps/build/spark-$SPARK_VERSION && /apps/build/spark-$SPARK_VERSION/dev/make-distribution.sh --name spark-$SPARK_VERSION --tgz -Phadoop-2.7 -Dhadoop.version=$HADOOP_VERSION -DskipTests -DXms=2g
 
-ENV SPARK_HOME /spark/
 
 RUN tar -zxvf /apps/build/spark-$SPARK_VERSION/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION.tgz -C /tmp/ && mkdir -p $SPARK_HOME && cp -rf /tmp/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION/* $SPARK_HOME && \
     rm -rf -- /tmp/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION/
