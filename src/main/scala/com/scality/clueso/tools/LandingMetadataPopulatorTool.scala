@@ -48,9 +48,11 @@ object LandingMetadataPopulatorTool extends LazyLogging {
     val partitionsRdd = spark.sparkContext.parallelize(numRecordsPerPartition, totalNumFiles.toInt)
 
     val generatedData = partitionsRdd.mapPartitions(it => {
+      val prefix = UUID.randomUUID().toString.substring(0, 4)
+
       val numRecords = it.next.toInt
       (1 to numRecords).map { recordNo =>
-        val key = s"landing-test-${UUID.randomUUID()}"
+        val key = s"${prefix}_${recordNo}"
         val food = if (Random.nextBoolean()) { "pizza" } else { "pasta" }
         val userMd = Map("x-amz-meta-food" -> food, "x-amz-meta-random" -> Random.nextInt(10).toString)
 
@@ -66,7 +68,7 @@ object LandingMetadataPopulatorTool extends LazyLogging {
           1, // md-model-version
           "", // owner-display-name", StringType)
           "", // owner-id", StringType)
-          Random.nextInt(1020), // content-length", IntegerType)
+          Random.nextInt(200), // content-length", IntegerType)
           "", // content-type
           "2017-08-08T03:57:02.249Z", // last-modified", StringType)
           "4b02d12ad7f063d67aec9dc2116a57a2", // content-md5
