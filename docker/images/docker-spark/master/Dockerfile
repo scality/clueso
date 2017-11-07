@@ -1,17 +1,35 @@
-#FROM bde2020/spark-base:2.1.0-hadoop2.8-hive-java8
-FROM scality/spark-base:hadoop2.8
+FROM java:openjdk-8-jdk
+MAINTAINER Vianney Rancurel <vr@scality.com>
 
-HEALTHCHECK CMD curl -f http://localhost:8080/ || exit 1
+ENV HADOOP_VERSION 2.8.1
+ENV SPARK_VERSION 2.1.1_2.11
+ENV SPARK_BRANCH 2.1.1 
 
-WORKDIR /
 
-COPY master.sh /
-RUN chmod +x /master.sh
+RUN apt-get update \
+    && apt-get install -y supervisor curl build-essential \
+    python git maven --no-install-recommends \
+    && mkdir -p /var/log/supervisor \
+    && curl --retry 6 \
+    -fSL https://www.apache.org/dist/hadoop/common/hadoop-$HADOOP_VERSION/hadoop-$HADOOP_VERSION.tar.gz -o /tmp/hadoop.tar.gz \
+    && apt-get install -y supervisor curl --no-install-recommends \
+    && mkdir -p /var/log/supervisor \
+    && tar -xvf /tmp/hadoop.tar.gz -C /opt/ \
+    && rm /tmp/hadoop.tar.gz
 
-ENV SPARK_MASTER_PORT 7077
-ENV SPARK_MASTER_WEBUI_PORT 8080
-ENV SPARK_MASTER_LOG /spark/logs
+RUN mkdir -p /apps/build/ && \
+    cd /apps/build/ && \
+    git clone https://github.com/apache/spark.git && \
+    mv spark spark-$SPARK_VERSION && \
+    cd spark-$SPARK_VERSION && \
+    git checkout tags/v$SPARK_BRANCH  && \
+   ./dev/change-scala-version.sh 2.11
 
-EXPOSE 8080 7077 6066
+RUN cd /apps/build/spark-$SPARK_VERSION && /apps/build/spark-$SPARK_VERSION/dev/make-distribution.sh --name spark-$SPARK_VERSION --tgz -Phadoop-2.7 -Dhadoop.version=$HADOOP_VERSION -DskipTests -DXms=2g
 
-CMD ["/bin/bash", "/master.sh"]
+ENV SPARK_HOME /spark/
+
+RUN tar -zxvf /apps/build/spark-$SPARK_VERSION/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION.tgz -C /tmp/ && mkdir -p $SPARK_HOME && cp -rf /tmp/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION/* $SPARK_HOME && \
+    rm -rf -- /tmp/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION/
+
+CMD bash
