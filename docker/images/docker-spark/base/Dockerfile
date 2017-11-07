@@ -5,7 +5,11 @@ ENV HADOOP_VERSION 2.8.1
 ENV SPARK_VERSION 2.1.1_2.11
 ENV SPARK_BRANCH 2.1.1 
 
-COPY conf 
+COPY conf /spark/conf/ 
+COPY wait-for-step.sh /
+COPY execute-step.sh /
+COPY finish-step.sh /
+COPY entrypoint.sh /usr/local/bin/
 
 RUN apt-get update \
     && apt-get install -y supervisor curl build-essential \
