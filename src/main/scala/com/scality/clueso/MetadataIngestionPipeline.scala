@@ -25,13 +25,14 @@ object MetadataIngestionPipeline extends LazyLogging {
       col("timestamp").cast(TimestampType).as("kafkaTimestamp"),
       trim(col("value").cast(StringType)).as("content")
     )
-      // defensive filtering to not process kafka garbage
+
+
+    // defensive filtering to not process kafka garbage
     df = df.filter(col("content").isNotNull)
           .filter(length(col("content")).gt(3))
           .select(
             col("kafkaTimestamp"),
-            from_json(col("content"), CluesoConstants.eventSchema)
-              .alias("event")
+            from_json(col("content"), CluesoConstants.eventSchema).alias("event")
           )
 
     df = df.filter(col("event").isNotNull.and(col("event.type").isNotNull))
@@ -62,11 +63,11 @@ object MetadataIngestionPipeline extends LazyLogging {
     val fs = SparkUtils.buildHadoopFs(config)
 //    fs.mkdirs(new Path(config.landingPath))
 //    fs.mkdirs(new Path(config.stagingPath))
-    logger.info(s"Creating directory ${AlluxioUtils.landingURI}")
-    logger.info(s"Creating directory ${AlluxioUtils.stagingURI}")
+    logger.info(s"Creating directory ${PathUtils.landingURI}")
+    logger.info(s"Creating directory ${PathUtils.stagingURI}")
 
-    fs.mkdirs(new Path(AlluxioUtils.landingURI))
-    fs.mkdirs(new Path(AlluxioUtils.stagingURI))
+    fs.mkdirs(new Path(PathUtils.landingURI))
+    fs.mkdirs(new Path(PathUtils.stagingURI))
 
 
     val spark = SparkUtils.buildSparkSession(config)
@@ -94,8 +95,14 @@ object MetadataIngestionPipeline extends LazyLogging {
       .format("parquet")
       .partitionBy("bucket")
       .outputMode(OutputMode.Append())
-      .option("path", AlluxioUtils.landingURI)
+      .option("path", PathUtils.landingURI)
       .start()
+//
+//    val maxRecordNumber = eventStream.select(col("opIndex"))
+//        .map(row => {
+//          val value = row.getString(row.fieldIndex("opIndex"))
+//          value.substring(0, 12).toLong
+//        }).rdd.max()
 
     query.awaitTermination()
   }

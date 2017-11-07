@@ -4,7 +4,7 @@ import java.io.File
 import java.sql.Timestamp
 import java.util.{Date, UUID}
 
-import com.scality.clueso.{CluesoConfig, CluesoConstants, SparkUtils}
+import com.scality.clueso.{CluesoConfig, CluesoConstants, PathUtils, SparkUtils}
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.fs.Path
@@ -21,7 +21,7 @@ object LandingMetadataPopulatorTool extends LazyLogging {
     val parsedConfig = ConfigFactory.parseFile(new File(args(0)))
     val _config = ConfigFactory.load(parsedConfig)
 
-    val config = new CluesoConfig(_config)
+    implicit val config = new CluesoConfig(_config)
 
     val spark = SparkUtils.buildSparkSession(config)
       .master("local[*]")
@@ -34,7 +34,7 @@ object LandingMetadataPopulatorTool extends LazyLogging {
 
     val fs = SparkUtils.buildHadoopFs(config)
 
-    val landing_path = s"s3a://${config.bucketName}/alluxio/landing/bucket=$bucketName"
+    val landing_path = s"${PathUtils.landingURI}/bucket=$bucketName"
 
     if (fs.exists(new Path(s"${landing_path}/"))) {
       logger.info(s"Deleting landing path: ${landing_path}")

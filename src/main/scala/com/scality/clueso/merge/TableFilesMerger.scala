@@ -4,8 +4,8 @@ import java.io.File
 import java.util.{Date, UUID}
 
 import com.scality.clueso.SparkUtils.parquetFilesFilter
+import com.scality.clueso._
 import com.scality.clueso.query.MetadataQueryExecutor
-import com.scality.clueso.{AlluxioUtils, CluesoConfig, CluesoConstants, SparkUtils}
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.fs.Path
@@ -24,8 +24,8 @@ class TableFilesMerger(spark : SparkSession, implicit val config: CluesoConfig) 
   def checkMergeEligibility(bucketName : String): Option[MergeInstructions] = {
 //    val landing_path = s"${config.landingPath}/bucket=$bucketName"
 //    val staging_path = s"${config.stagingPath}/bucket=$bucketName"
-    val landing_path = s"${AlluxioUtils.landingURI}/bucket=$bucketName"
-    val staging_path = s"${AlluxioUtils.stagingURI}/bucket=$bucketName"
+    val landing_path = s"${PathUtils.landingURI}/bucket=$bucketName"
+    val staging_path = s"${PathUtils.stagingURI}/bucket=$bucketName"
 
 
     val (landingFileCount, landingAvgFileSize) = SparkUtils.getParquetFilesStats(fs, landing_path)
@@ -67,7 +67,7 @@ class TableFilesMerger(spark : SparkSession, implicit val config: CluesoConfig) 
   def merge() = {
     // go thru all partitions and see which ones are eligible for merging
 //    val landingPartitionsIt = fs.listStatus(new Path(config.landingPath)).iterator
-    val landingPartitionsIt = fs.listStatus(new Path(AlluxioUtils.landingURI)).iterator
+    val landingPartitionsIt = fs.listStatus(new Path(PathUtils.landingURI)).iterator
 
     while (landingPartitionsIt.hasNext) {
       val fileStatus = landingPartitionsIt.next()
@@ -142,8 +142,8 @@ class TableFilesMerger(spark : SparkSession, implicit val config: CluesoConfig) 
     if (acquireLock(lockFilePath)) {
       val startTs = new Date().getTime
 
-      val stagingPartitionPath = s"${AlluxioUtils.stagingURI}/$partitionColumnName=$partitionValue"
-      val landingPartitionPath = s"${AlluxioUtils.landingURI}/$partitionColumnName=$partitionValue"
+      val stagingPartitionPath = s"${PathUtils.stagingURI}/$partitionColumnName=$partitionValue"
+      val landingPartitionPath = s"${PathUtils.landingURI}/$partitionColumnName=$partitionValue"
 
       try {
         val mergedData = readLandingAndStagingTableData(landingPartitionPath, stagingPartitionPath)
@@ -152,7 +152,7 @@ class TableFilesMerger(spark : SparkSession, implicit val config: CluesoConfig) 
 
         replaceStagingWithMerged(stagingPartitionPath, outputPath)
 
-        deleteMetadataDir(AlluxioUtils.landingURI)
+        deleteMetadataDir(PathUtils.landingURI)
 
         // TODO wait a bit before removing..
 

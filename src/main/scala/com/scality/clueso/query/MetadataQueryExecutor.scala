@@ -6,8 +6,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{concurrent => juc}
 
 import com.scality.clueso.SparkUtils._
-import com.scality.clueso.query.cache.{AlluxioCacheManager, SessionCacheManager}
-import com.scality.clueso.{AlluxioUtils, CluesoConfig, CluesoConstants, SparkUtils}
+import com.scality.clueso._
+import com.scality.clueso.query.cache.SessionCacheManager
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.fs.FileSystem
 import org.apache.spark.SparkContext
@@ -64,11 +64,7 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
       setupDf(spark, config, bucketName)
     } else {
       // delegate to cache manager
-      if (config.cacheInAlluxio) {
-        AlluxioCacheManager.getCachedBucketDataframe(spark, bucketName, alluxioFs)
-      } else {
-        SessionCacheManager.getCachedBucketDataframe(spark, bucketName)
-      }
+      SessionCacheManager.getCachedBucketDataframe(spark, bucketName)
     }
   }
 
@@ -151,11 +147,11 @@ object MetadataQueryExecutor extends LazyLogging {
     col("message"))
 
   def getColdStagingTable(spark : SparkSession, config : CluesoConfig, bucketName : String) = {
-    logger.info(s"Reading cold staging table ${AlluxioUtils.stagingURI(config)}")
+    logger.info(s"Reading cold staging table ${PathUtils.stagingURI(config)}")
 
     val _stagingTable = spark.read
       .schema(CluesoConstants.storedEventSchema)
-      .parquet(AlluxioUtils.stagingURI(config))
+      .parquet(PathUtils.stagingURI(config))
       .createOrReplaceTempView("staging")
 
     // what does this do?
@@ -172,11 +168,11 @@ object MetadataQueryExecutor extends LazyLogging {
   }
 
   def getColdLandingTable(spark : SparkSession, config : CluesoConfig, bucketName : String) = {
-    logger.info(s"Reading cold landing table ${AlluxioUtils.landingURI(config)}")
+    logger.info(s"Reading cold landing table ${PathUtils.landingURI(config)}")
 
     val _landingTable = spark.read
       .schema(CluesoConstants.storedEventSchema)
-      .parquet(AlluxioUtils.landingURI(config))
+      .parquet(PathUtils.landingURI(config))
       .createOrReplaceTempView("landing")
 
     // need to name somehow so alluxio caches bucket separately?
