@@ -55,12 +55,14 @@ object CluesoConstants {
 
 
   val eventSchema = new StructType()
+    .add("opIndex", StringType, true)
     .add("type", StringType, true)
     .add("bucket", StringType)
     .add("key", StringType, false)
     .add("value", new StructType(eventValueSchema.fields), false)
 
   val storedEventSchema = new StructType()
+    .add("opIndex", StringType)
     .add("bucket", StringType)
     .add("key", StringType, false)
     .add("kafkaTimestamp", TimestampType, false)
