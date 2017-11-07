@@ -12,8 +12,9 @@ ENV SPARK_WORKER_WEBUI_PORT 8081
 ENV SPARK_WORKER_LOG /spark/logs
 ENV SPARK_MASTER "spark://spark-master:7077"
 
-COPY --from=alluxio /opt/* /opt/alluxio/
-COPY conf/* /spark/conf/
+COPY --from=alluxio /opt/alluxio/ /opt/alluxio/
+COPY conf/alluxio-worker/* /opt/alluxio/conf/
+
 EXPOSE 8081 19998 19999
 
 CMD ["/bin/bash", "/worker.sh"]
