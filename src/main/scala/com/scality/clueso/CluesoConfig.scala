@@ -22,8 +22,6 @@ class CluesoConfig(config: Config) {
   val stagingPath = s"s3a://$bucketName$bucketStagingPath"
   val mergePath = s"s3a://$bucketName$bucketMergePath"
 
-  val alluxioLandingPath = config.getString("alluxio_landing_path")
-  val alluxioStagingPath = config.getString("alluxio_staging_path")
 
   val mergeFrequency = config.getDuration("merge_frequency")
   val mergeFactor = config.getInt("merge_factor")
@@ -39,23 +37,16 @@ class CluesoConfig(config: Config) {
   val kafkaBootstrapServers = config.getString("kafka_bootstrap_servers")
   val kafkaTopic = config.getString("kafka_topic")
 
-  val readViaAlluxio = config.getBoolean("read_via_alluxio")
-  val cacheInAlluxio = config.getBoolean("cache_in_alluxio")
   val cacheDataframes = config.hasPath("cache_dataframes") && config.getBoolean("cache_dataframes")
 
   val graphiteHost = config.getString("graphite.hostname")
   val graphitePort = config.getInt("graphite.port")
 
-  val alluxioHost = config.getString("alluxio.hostname")
-  val alluxioPort = config.getInt("alluxio.port")
-
   // number of files to keep
-  val pastCacheRetention = config.getInt("alluxio.cache_retention_nofiles")
+  val pastCacheRetention = config.getInt("cache_retention_nofiles")
   // controls after how much time should we evict the oldest cache, after finish a new computation
-  val cleanPastCacheDelay = config.getDuration("alluxio.clean_past_cache_delay")
+  val cleanPastCacheDelay = config.getDuration("clean_past_cache_delay")
 
-
-  def alluxioUrl = s"alluxio://$alluxioHost:$alluxioPort/"
 
   import scala.collection.JavaConversions._
   override def toString: String = config.entrySet().map { entry =>

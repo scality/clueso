@@ -61,8 +61,7 @@ object MetadataIngestionPipeline extends LazyLogging {
 
     // create dir no matter what
     val fs = SparkUtils.buildHadoopFs(config)
-//    fs.mkdirs(new Path(config.landingPath))
-//    fs.mkdirs(new Path(config.stagingPath))
+
     logger.info(s"Creating directory ${PathUtils.landingURI}")
     logger.info(s"Creating directory ${PathUtils.stagingURI}")
 
@@ -73,8 +72,6 @@ object MetadataIngestionPipeline extends LazyLogging {
     val spark = SparkUtils.buildSparkSession(config)
       .appName("Metadata Ingestion Pipeline")
       .getOrCreate()
-
-    SparkUtils.confAlluxioCacheThruWrites(spark, config)
 
     val mergerService = new MergeService(spark, config)
 
@@ -97,7 +94,9 @@ object MetadataIngestionPipeline extends LazyLogging {
       .outputMode(OutputMode.Append())
       .option("path", PathUtils.landingURI)
       .start()
-//
+
+
+
 //    val maxRecordNumber = eventStream.select(col("opIndex"))
 //        .map(row => {
 //          val value = row.getString(row.fieldIndex("opIndex"))

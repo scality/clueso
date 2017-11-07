@@ -53,8 +53,6 @@ dependencies {
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: '2.6.5'
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.6.5'
 
-    // alluxio
-    compile group: 'org.alluxio', name: 'alluxio-core-client', version: '1.5.0'
 
     // required for the Metrics System
     compile group: 'org.eclipse.jetty', name: 'jetty-server', version: '9.3.20.v20170531'
@@ -75,7 +73,6 @@ dependencies {
     // tools command line opt parsing
     compile group: 'org.rogach', name: 'scallop_2.11', version: '3.1.0'
 
-    compile group: 'org.alluxio', name: 'alluxio-core-client-hdfs', version: '1.5.0'
 
 
     testCompile 'org.apache.spark:spark-sql_'+scalaVersion+':' + sparkVersion
@@ -98,8 +95,6 @@ shadowJar {
             it.moduleGroup == 'org.scala-lang'
         })
 
-        exclude('alluxio-site.properties')
-
         exclude(dependency {
             it.moduleGroup == 'org.apache.spark' && !it.moduleName.startsWith('spark-sql-kafka-')
         })
@@ -117,7 +112,6 @@ task toolShadowJar(type: com.github.jengelman.gradle.plugins.shadow.tasks.Shadow
 
     exclude('META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA')
     exclude('metrics.properties')
-    exclude('alluxio-site.properties')
 
     zip64 true
 }

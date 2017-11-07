@@ -1,15 +1,12 @@
 package com.scality.clueso.query
 
-import java.net.URI
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{concurrent => juc}
 
-import com.scality.clueso.SparkUtils._
 import com.scality.clueso._
 import com.scality.clueso.query.cache.SessionCacheManager
 import com.typesafe.scalalogging.LazyLogging
-import org.apache.hadoop.fs.FileSystem
 import org.apache.spark.SparkContext
 import org.apache.spark.clueso.metrics.SearchMetricsSource
 import org.apache.spark.sql.expressions.Window
@@ -27,7 +24,6 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
   implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
 
   var lockedBucketName : Option[String] = None
-  val alluxioFs = FileSystem.get(new URI(s"${config.alluxioUrl}/"), hadoopConfig(config))
 
   SearchMetricsSource(spark, config)
 
@@ -46,15 +42,6 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
   sys.addShutdownHook {
     metricsRegisterCancel.set(true)
-    alluxioFs.close()
-  }
-
-  if (config.cacheInAlluxio) {
-    confAlluxioCache(spark, config)
-  }
-
-  if (config.readViaAlluxio) {
-    confAlluxioReads(spark, config)
   }
 
 

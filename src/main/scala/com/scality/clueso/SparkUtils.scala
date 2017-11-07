@@ -32,7 +32,6 @@ object SparkUtils extends LazyLogging {
     c.set("fs.s3a.access.key", config.s3AccessKey)
     c.set("fs.s3a.secret.key", config.s3SecretKey)
     c.set("fs.s3a.path.style.access", config.s3PathStyleAccess)
-    c.set("fs.alluxio.impl", "alluxio.hadoop.FileSystem")
 
     c
   }
@@ -50,25 +49,6 @@ object SparkUtils extends LazyLogging {
       .config("spark.hadoop.fs.s3a.secret.key", config.s3SecretKey)
       .config("spark.hadoop.fs.s3a.path.style.access", config.s3PathStyleAccess)
       .config("spark.sql.streaming.metricsEnabled", "true")
-      .config("fs.alluxio.impl", "alluxio.hadoop.FileSystem")
-
-  }
-
-  def confAlluxioCacheThruWrites(spark : SparkSession, config : CluesoConfig) = {
-    logger.debug("Configuring Alluxio Client for CACHE_THROUGH writes")
-    spark.conf.set("alluxio.user.file.writetype.default", "CACHE_THROUGH")
-    spark.conf.set("alluxio.user.block.size.bytes.default", "16MB")
-  }
-
-  def confAlluxioCache(spark : SparkSession, config : CluesoConfig) = {
-    logger.debug("Configuring Alluxio Client for MUST_CACHE writes")
-    spark.conf.set("alluxio.user.file.writetype.default", "MUST_CACHE")
-    spark.conf.set("alluxio.user.block.size.bytes.default", "16MB")
-  }
-
-  def confAlluxioReads(spark : SparkSession, config : CluesoConfig) = {
-    logger.debug("Configuring Alluxio Client for CACHE_PROMOTE reads")
-    spark.conf.set("alluxio.user.file.readtype.default", "CACHE_PROMOTE")
   }
 
   def confSparkSession(spark : SparkSession, config : CluesoConfig) = {
@@ -83,8 +63,6 @@ object SparkUtils extends LazyLogging {
     spark.conf.set("spark.hadoop.fs.s3a.path.style.access", config.s3PathStyleAccess)
     spark.conf.set("fs.s3a.path.style.access", config.s3PathStyleAccess)
     spark.conf.set("spark.sql.streaming.metricsEnabled", "true")
-    spark.conf.set("fs.alluxio.impl", "alluxio.hadoop.FileSystem")
-
   }
 
   import scala.util.parsing.json.JSONObject
