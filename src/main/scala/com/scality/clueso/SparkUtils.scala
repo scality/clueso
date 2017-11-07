@@ -122,7 +122,8 @@ object SparkUtils extends LazyLogging {
       }
     }
 
-    resultArray}
+    resultArray
+  }
 
 
   val parquetFilesFilter = new PathFilter {
@@ -141,9 +142,7 @@ object SparkUtils extends LazyLogging {
     val statusList = if (!fs.exists(fsPath)) {
       Array[FileStatus]()
     } else {
-      fs.listStatus(new Path(path), new PathFilter {
-        override def accept(path: Path): Boolean = path.getName.endsWith(".parquet")
-      })
+      fs.listStatus(new Path(path), parquetFilesFilter)
     }
 
     val fileCount = statusList.count(_ => true)

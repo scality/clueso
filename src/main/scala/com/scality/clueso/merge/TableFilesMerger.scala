@@ -142,9 +142,6 @@ class TableFilesMerger(spark : SparkSession, implicit val config: CluesoConfig) 
     if (acquireLock(lockFilePath)) {
       val startTs = new Date().getTime
 
-//      val stagingPartitionPath = s"${config.stagingPath}/$partitionColumnName=$partitionValue"
-//      val landingPartitionPath = s"${config.landingPath}/$partitionColumnName=$partitionValue"
-
       val stagingPartitionPath = s"${AlluxioUtils.stagingURI}/$partitionColumnName=$partitionValue"
       val landingPartitionPath = s"${AlluxioUtils.landingURI}/$partitionColumnName=$partitionValue"
 
@@ -155,7 +152,6 @@ class TableFilesMerger(spark : SparkSession, implicit val config: CluesoConfig) 
 
         replaceStagingWithMerged(stagingPartitionPath, outputPath)
 
-//        deleteMetadataDir(config.landingPath)
         deleteMetadataDir(AlluxioUtils.landingURI)
 
         // TODO wait a bit before removing..

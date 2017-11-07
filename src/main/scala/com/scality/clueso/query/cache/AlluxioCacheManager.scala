@@ -9,7 +9,6 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 object AlluxioCacheManager extends LazyLogging {
@@ -24,19 +23,17 @@ object AlluxioCacheManager extends LazyLogging {
 
       if (!cacheComputationBeingExecuted(alluxioFs, bucketName)) {
         // async exec:
-        Future {
-          val tmpDir = alluxioTempPath(Some(bucketName))
-          logger.info(s"Cache being async written to ${tmpDir.toUri.toString}")
 
-          bucketDf.write.parquet(tmpDir.toUri.toString)
+        val tmpDir = alluxioTempPath(Some(bucketName))
+        logger.info(s"Cache being async written to ${tmpDir.toUri.toString}")
 
-          val tableView = alluxioCachePath(bucketName).toUri.toString
+        bucketDf.write.parquet(tmpDir.toUri.toString)
 
-          logger.info(s"Renaming tmpDir ${tmpDir.toUri.toString} to ${tableView}")
-          alluxioFs.rename(tmpDir, new Path(tableView))
-        }
+        val tableView = alluxioCachePath(bucketName).toUri.toString
+
+        logger.info(s"Renaming tmpDir ${tmpDir.toUri.toString} to ${tableView}")
+        alluxioFs.rename(tmpDir, new Path(tableView))
       }
-
 
       bucketDf
     } else {
