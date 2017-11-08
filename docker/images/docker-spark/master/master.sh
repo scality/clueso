@@ -1,5 +1,23 @@
 #!/bin/bash
 
+python runTasks.py
+
+printf 'Waiting for spark...'
+until $(curl --output /dev/null --silent --head --fail http://localhost:8080); do
+     printf '.'
+     sleep 1
+done
+
+java -cp /apps/spark/conf:/apps/spark/jars/* \
+     -Xmx512m org.apache.spark.deploy.SparkSubmit \
+     --conf spark.executor.memory=512m \
+     --conf spark.driver.memory=512m \
+     --conf spark.master=spark://spark-master:7077 \
+     --conf spark.driver.cores=1 --conf spark.executor.cores=1 --class com.scality.clueso.MetadataIngestionPipeline \
+     --name "Clueso Metadata Ingestion Pipeline" \
+     --queue default file:///apps/spark/modules/clueso.jar /app/spark-modules/application.conf \
+     --conf spark.cores.max=2
+
 export SPARK_MASTER_IP=`hostname`
 
 . "/spark/sbin/spark-config.sh"
