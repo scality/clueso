@@ -6,12 +6,12 @@ session = boto3.session.Session()
 
 s3 = session.client(
     service_name='s3',
-    endpoint_url='http://lb',
+    endpoint_url='http://127.0.0.1',
 )
 
 s3Resource = session.resource(
     service_name='s3',
-    endpoint_url='http://lb',
+    endpoint_url='http://127.0.0.1',
 )
 
 bucketName = "METADATA"
@@ -34,13 +34,12 @@ for obj in bucket.objects.filter(Prefix=sparkPrefix):
     print "Found object to delete: %s" % obj.key
 
 print "List of keys to delete: %s" % keysToDelete
-
-response = s3.delete_objects(
-    Bucket=bucketName,
-    Delete={
-        'Objects': keysToDelete,
-        'Quiet': False
-    },
-)
-
-print "Response from deleting objects: %s" % response
+if len(keysToDelete) > 0:
+    response = s3.delete_objects(
+        Bucket=bucketName,
+        Delete={
+            'Objects': keysToDelete,
+            'Quiet': False
+        },
+    )
+    print "Response from deleting objects: %s" % response

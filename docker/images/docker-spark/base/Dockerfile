@@ -5,6 +5,7 @@ ENV HADOOP_VERSION 2.8.1
 ENV SPARK_BRANCH 2.1.1 
 ENV SPARK_HOME /spark/
 ENV SPARK_VERSION 2.1.1_2.11
+ENV JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 
 COPY conf /spark/conf/ 
 

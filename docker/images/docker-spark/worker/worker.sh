@@ -1,6 +1,5 @@
 #!/bin/bash
 
-   # Spark worker actions:
   . "/spark/sbin/spark-config.sh"
 
   . "/spark/bin/load-spark-env.sh"
