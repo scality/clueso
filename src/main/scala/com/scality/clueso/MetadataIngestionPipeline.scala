@@ -69,9 +69,22 @@ object MetadataIngestionPipeline extends LazyLogging {
   val msgRewriteFun = (bytes: Array[Byte]) =>
     EventMessageRewriterWrapper.deser.rewriteMsg(bytes)
 
+//  val compactionRecordInterval = config.compactionRecordInterval
+
+  val maxOpIndexFun = (compactionRecordInterval:Long, value : String) => {
+    val recordNo = value.substring(0, 12).toLong
+
+    if (recordNo % compactionRecordInterval == 0) {
+      recordNo
+    } else {
+      recordNo + compactionRecordInterval - recordNo % compactionRecordInterval
+    }
+  }
+
   import org.apache.spark.sql.functions.udf
   val msg_rewrite = udf(msgRewriteFun)
 
+  val max_op_index = udf(maxOpIndexFun)
 
   /**
     * Applies projections and conditions to incoming data frame
@@ -82,7 +95,7 @@ object MetadataIngestionPipeline extends LazyLogging {
     * @param eventStream
     * @return
     */
-  def filterAndParseEvents(bucketNameToFilterOut : String, eventStream: DataFrame)(implicit spark : SparkSession) = {
+  def filterAndParseEvents(bucketNameToFilterOut : String, eventStream: DataFrame)(implicit spark : SparkSession, config: CluesoConfig) = {
 
     var df = eventStream.select(
       col("timestamp").cast(TimestampType).as("kafkaTimestamp"),
@@ -110,13 +123,17 @@ object MetadataIngestionPipeline extends LazyLogging {
           ), col("event.bucket")).otherwise("NOBUCKET")
       )
       .withColumn("type", col("event.type"))
+      .withColumn("opIndex", col("event.opIndex"))
+      .withColumn("maxOpIndex", max_op_index(lit(config.compactionRecordInterval), col("event.opIndex")))
       .withColumn("message", col("event.value"))
 
     df = df.filter(
       !col("bucket").eqNullSafe(bucketNameToFilterOut) &&
         !col("bucket").eqNullSafe("users..bucket") &&
         !col("bucket").eqNullSafe("__metastore") &&
-        !col("bucket").startsWith("mpuShadowBucket"))
+        (col("bucket").isNotNull && !col("bucket").startsWith("mpuShadowBucket")))
+
+//      df = df.filter(!col("bucket").eqNullSafe(bucketNameToFilterOut))
 
       df.drop("event")
   }
@@ -140,19 +157,38 @@ object MetadataIngestionPipeline extends LazyLogging {
       .appName("Metadata Ingestion Pipeline")
       .getOrCreate()
 
-//    val mergerService = new MergeService(spark, config)
+    import spark.implicits._
+
+    //    val mergerService = new MergeService(spark, config)
 
     val eventStream = spark.readStream
       .format("kafka")
       .option("kafka.bootstrap.servers", config.kafkaBootstrapServers)
       .option("subscribe", config.kafkaTopic)
-      // TODO custom offsets depending on recovery point
       .option("startingOffsets", "earliest")
       .option("failOnDataLoss", "false")
       .load()
 
-    val writeStream = filterAndParseEvents(config.bucketName, eventStream).writeStream
+    val filteredEventsDf = filterAndParseEvents(config.bucketName, eventStream)
+
+
+    val compactionRecordInterval = config.compactionRecordInterval
+    val compactionTriggerDf = filteredEventsDf
+      .select(col("opIndex"))
+      .as[String]
+      .flatMap(value => {
+        val recordNo = value.substring(0, 12).toLong
+
+        if (recordNo > 0 && recordNo % compactionRecordInterval == 0) {
+          Some(recordNo)
+        } else {
+          None
+        }
+      })
+
+    val writeStream = filteredEventsDf.writeStream
       .trigger(ProcessingTime(config.triggerTime.toMillis))
+
 
     val query = writeStream
       .option("checkpointLocation", config.checkpointUrl)
@@ -162,13 +198,13 @@ object MetadataIngestionPipeline extends LazyLogging {
       .option("path", PathUtils.landingURI)
       .start()
 
+    // TODO reimplement this with state
 
-
-//    val maxRecordNumber = eventStream.select(col("opIndex"))
-//        .map(row => {
-//          val value = row.getString(row.fieldIndex("opIndex"))
-//          value.substring(0, 12).toLong
-//        }).rdd.max()
+//    compactionTriggerDf.collect.foreach(recordNo => {
+//      // trigger compaction async
+//      logger.info(s"Compaction trigger for recordNo = ${recordNo}")
+//      // TODO
+//    })
 
     query.awaitTermination()
   }

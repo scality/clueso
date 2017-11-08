@@ -34,6 +34,8 @@ class CluesoConfig(config: Config) {
 
   val triggerTime = config.getDuration("trigger_time")
 
+  val compactionRecordInterval = config.getLong("compaction_record_interval")
+
   val kafkaBootstrapServers = config.getString("kafka_bootstrap_servers")
   val kafkaTopic = config.getString("kafka_topic")
 
