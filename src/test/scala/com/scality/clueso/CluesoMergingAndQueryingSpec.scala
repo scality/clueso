@@ -4,8 +4,6 @@ import java.io.File
 import java.sql.Timestamp
 
 import com.amazonaws.services.s3.S3ClientOptions
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.node.{ObjectNode, TextNode}
 import com.scality.clueso.merge.TableFilesMerger
 import com.scality.clueso.query.{MetadataQuery, MetadataQueryExecutor}
 import com.typesafe.config.ConfigFactory
@@ -22,6 +20,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
         import spark.implicits._
         implicit val _spark = spark
+        implicit val _config = config
 
         val fs = SparkUtils.buildHadoopFs(config)
         fs.mkdirs(new Path(config.stagingPath))
@@ -60,6 +59,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
         import spark.implicits._
         implicit val _spark = spark
+        implicit val _config = config
 
         val fs = SparkUtils.buildHadoopFs(config)
         fs.mkdirs(new Path(config.stagingPath))
@@ -118,6 +118,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
         import spark.implicits._
         implicit val _spark = spark
+        implicit val _config = config
 
         val now = new java.util.Date().getTime
 
@@ -181,6 +182,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
         import spark.implicits._
         implicit val _spark = spark
+        implicit val _config = config
 
         val now = new java.util.Date().getTime
 
@@ -263,6 +265,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
         import spark.implicits._
         implicit val _spark = spark
+        implicit val _config = config
 
         val now = new java.util.Date().getTime
 
@@ -340,20 +343,6 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
         // then same result as before
         result.count() shouldBe 2
-    }
-
-    "Scenario 6: can rewrite user metadata properties JSON" in {
-      val payload = """{"opIndex":"000006636351_000000","type":"put","bucket":"search10m","key":"4557700","value":"{\"md-model-version\":3,\"owner-display-name\":\"CustomAccount\",\"owner-id\":\"12349df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47qwer\",\"content-length\":0,\"content-type\":\"application/octet-stream\",\"last-modified\":\"2017-10-24T01:31:45.285Z\",\"content-md5\":\"d41d8cd98f00b204e9800998ecf8427e\",\"x-amz-version-id\":\"null\",\"x-amz-server-version-id\":\"\",\"x-amz-storage-class\":\"STANDARD\",\"x-amz-server-side-encryption\":\"\",\"x-amz-server-side-encryption-aws-kms-key-id\":\"\",\"x-amz-server-side-encryption-customer-algorithm\":\"\",\"x-amz-website-redirect-location\":\"\",\"acl\":{\"Canned\":\"private\",\"FULL_CONTROL\":[],\"WRITE_ACP\":[],\"READ\":[],\"READ_ACP\":[]},\"key\":\"\",\"location\":null,\"isDeleteMarker\":false,\"tags\":{\"tagzzz1\":\"value1\",\"tagzzz2\":\"value2\"},\"replicationInfo\":{\"status\":\"\",\"content\":[],\"destination\":\"\",\"storageClass\":\"\",\"role\":\"\"},\"dataStoreName\":\"us-east-1\",\"x-amz-meta-color\":\"blue\",\"x-amz-meta-someotherkey\":\"someOtherMetadata4557700\"}"}"""
-      val newPayload = MetadataIngestionPipeline.msgRewriteFun(payload.getBytes)
-
-      val mapper = new ObjectMapper()
-      val root = mapper.readTree(newPayload)
-
-      Option(root.get("x-amz-meta-color")).isEmpty shouldEqual true
-      val userMd = root.get("value").get("userMd").asInstanceOf[ObjectNode]
-      Option(userMd).isDefined shouldEqual true
-      Option(userMd.get("x-amz-meta-color")).isDefined shouldEqual true
-      userMd.get("x-amz-meta-color").asInstanceOf[TextNode].textValue() shouldEqual "blue"
     }
   }
 }
