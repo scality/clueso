@@ -6,7 +6,7 @@ import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.streaming.{OutputMode, ProcessingTime}
+import org.apache.spark.sql.streaming.{GroupState, OutputMode, ProcessingTime}
 import org.apache.spark.sql.types.TimestampType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -138,6 +138,18 @@ object MetadataIngestionPipeline extends LazyLogging {
       df.drop("event")
   }
 
+  def stateFun(recordNo: Long, it: Iterator[Long], state: GroupState[List[Long]]): Option[Long] = {
+    if (!state.hasTimedOut) {
+      if (state.getOption.isEmpty) {
+        state.update(List[Long](recordNo))
+      } else {
+        state.update(state.get ++ List(recordNo))
+      }
+    }
+
+    Some(recordNo)
+  }
+
   def main(args: Array[String]): Unit = {
     require(args.length > 0, "specify configuration file")
 
@@ -169,8 +181,8 @@ object MetadataIngestionPipeline extends LazyLogging {
       .option("failOnDataLoss", "false")
       .load()
 
-    val filteredEventsDf = filterAndParseEvents(config.bucketName, eventStream)
 
+    val filteredEventsDf = filterAndParseEvents(config.bucketName, eventStream)
 
     val compactionRecordInterval = config.compactionRecordInterval
     val compactionTriggerDf = filteredEventsDf
@@ -184,6 +196,14 @@ object MetadataIngestionPipeline extends LazyLogging {
         } else {
           None
         }
+      })
+
+
+    compactionTriggerDf
+      .groupByKey(x => x)
+      .mapGroupsWithState[List[Long], Option[Long]](stateFun _)
+      .foreach(recordNo => {
+        logger.info(s" TRIGGER: ${recordNo}")
       })
 
     val writeStream = filteredEventsDf.writeStream
