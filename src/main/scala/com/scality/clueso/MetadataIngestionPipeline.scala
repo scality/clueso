@@ -1,57 +1,76 @@
 package com.scality.clueso
 
-import com.fasterxml.jackson.databind.node.{ArrayNode, ObjectNode}
+import com.fasterxml.jackson.databind.node.{ArrayNode, NullNode, ObjectNode, TextNode}
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
-import com.scality.clueso.merge.MergeService
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.{OutputMode, ProcessingTime}
-import org.apache.spark.sql.types.{StringType, TimestampType}
-import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql.types.TimestampType
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import scala.collection.mutable
 
-object MetadataIngestionPipeline extends LazyLogging {
+class EventMessageRewriter {
   val mapper = new ObjectMapper()
 
-  // assumes to have payload on index 0
-  def buildJsonUserMetadataObject: Row => Row = row => {
-    val payload = row.getString(0)
+  def rewriteMsg(bytes: Array[Byte]): String = {
+    val payload = new String(bytes)
 
     var rootNode = mapper.readTree(payload).asInstanceOf[ObjectNode]
-    rootNode = rootNode.path("value").asInstanceOf[ObjectNode]
+
+    val valueTxtNode = rootNode.path("value").asInstanceOf[TextNode]
+
+    val valueNode = mapper.readTree(valueTxtNode.asText()).asInstanceOf[ObjectNode]
 
     val metadataFieldNames = mutable.ListBuffer[String]()
 
-    val it = rootNode.fieldNames()
+    val it = valueNode.fieldNames()
     while (it.hasNext) {
       val fieldName = it.next()
       if (fieldName.startsWith("x-amz-meta-")) {
         metadataFieldNames += fieldName
       } else if (fieldName.equals("location")) {
-        val locationArray = rootNode.path("location").asInstanceOf[ArrayNode]
-        // TODO test
-        if (locationArray != null && locationArray.size() > 1) {
-          (1 until locationArray.size()).foreach(i => locationArray.remove(i))
+        val locationArray = valueNode.path("location")
+
+        if (!locationArray.isInstanceOf[NullNode] && locationArray.asInstanceOf[ArrayNode].size() > 1) {
+          val _locationArray =  locationArray.asInstanceOf[ArrayNode]
+          (1 until locationArray.size()).foreach(i => _locationArray.remove(i))
+          valueNode.replace("location", _locationArray)
         }
       }
     }
 
     val userMd = if (rootNode.has("userMd")) {
-      rootNode.path("userMd").asInstanceOf[ObjectNode]
+      valueNode.path("userMd").asInstanceOf[ObjectNode]
     } else {
-      rootNode.putObject("userMd")
+      valueNode.putObject("userMd")
     }
 
     for (fieldName <- metadataFieldNames) {
-      userMd.set(fieldName, rootNode.path(fieldName).deepCopy().asInstanceOf[JsonNode])
-      rootNode.remove(fieldName)
+      userMd.set(fieldName, valueNode.path(fieldName).deepCopy().asInstanceOf[JsonNode])
+      valueNode.remove(fieldName)
     }
 
-    Row(mapper.writeValueAsString(rootNode))
+    valueNode.replace("userMd", userMd)
+    rootNode.replace("value", valueNode)
+
+    mapper.writeValueAsString(rootNode)
   }
+}
+
+object EventMessageRewriterWrapper {
+  val deser = new EventMessageRewriter
+}
+
+object MetadataIngestionPipeline extends LazyLogging {
+
+  val msgRewriteFun = (bytes: Array[Byte]) =>
+    EventMessageRewriterWrapper.deser.rewriteMsg(bytes)
+
+  import org.apache.spark.sql.functions.udf
+  val msg_rewrite = udf(msgRewriteFun)
 
 
   /**
@@ -63,17 +82,16 @@ object MetadataIngestionPipeline extends LazyLogging {
     * @param eventStream
     * @return
     */
-  def filterAndParseEvents(bucketNameToFilterOut : String, eventStream: DataFrame) = {
+  def filterAndParseEvents(bucketNameToFilterOut : String, eventStream: DataFrame)(implicit spark : SparkSession) = {
+
     var df = eventStream.select(
       col("timestamp").cast(TimestampType).as("kafkaTimestamp"),
-      trim(col("value").cast(StringType)).as("content")
+      msg_rewrite(col("value")).as("content")
     )
 
     // defensive filtering to not process kafka garbage
     df = df.filter(col("content").isNotNull)
           .filter(length(col("content")).gt(3))
-          .select(col("content"))
-          .map(buildJsonUserMetadataObject)
           .select(
             col("kafkaTimestamp"),
             from_json(col("content"), CluesoConstants.eventSchema).alias("event")
@@ -94,8 +112,13 @@ object MetadataIngestionPipeline extends LazyLogging {
       .withColumn("type", col("event.type"))
       .withColumn("message", col("event.value"))
 
-    df = df.filter(!col("bucket").eqNullSafe(bucketNameToFilterOut))
-    df.drop("event")
+    df = df.filter(
+      !col("bucket").eqNullSafe(bucketNameToFilterOut) &&
+        !col("bucket").eqNullSafe("users..bucket") &&
+        !col("bucket").eqNullSafe("__metastore") &&
+        !col("bucket").startsWith("mpuShadowBucket"))
+
+      df.drop("event")
   }
 
   def main(args: Array[String]): Unit = {
@@ -113,11 +136,11 @@ object MetadataIngestionPipeline extends LazyLogging {
     fs.mkdirs(new Path(PathUtils.stagingURI))
 
 
-    val spark = SparkUtils.buildSparkSession(config)
+    implicit val spark = SparkUtils.buildSparkSession(config)
       .appName("Metadata Ingestion Pipeline")
       .getOrCreate()
 
-    val mergerService = new MergeService(spark, config)
+//    val mergerService = new MergeService(spark, config)
 
     val eventStream = spark.readStream
       .format("kafka")
