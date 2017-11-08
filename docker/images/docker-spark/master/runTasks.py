@@ -1,4 +1,3 @@
-#!/bin/python
 import boto3
 import json
 from botocore.exceptions import ClientError
@@ -7,15 +6,15 @@ session = boto3.session.Session()
 
 s3 = session.client(
     service_name='s3',
-    endpoint_url='http://localhost:8000',
+    endpoint_url='http://lb',
 )
 
 s3Resource = session.resource(
     service_name='s3',
-    endpoint_url='http://localhost:8000',
+    endpoint_url='http://lb',
 )
 
-bucketName = "foo"
+bucketName = "METADATA"
 sparkPrefix = "landing/_spark_metadata/"
 try:
     s3.create_bucket(Bucket=bucketName)
@@ -34,6 +33,8 @@ for obj in bucket.objects.filter(Prefix=sparkPrefix):
     keysToDelete.append({'Key': obj.key})
     print "Found object to delete: %s" % obj.key
 
+print "List of keys to delete: %s" % keysToDelete
+
 response = s3.delete_objects(
     Bucket=bucketName,
     Delete={
@@ -42,4 +43,4 @@ response = s3.delete_objects(
     },
 )
 
-print response
+print "Response from deleting objects: %s" % response
