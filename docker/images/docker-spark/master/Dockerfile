@@ -5,10 +5,9 @@ HEALTHCHECK CMD curl -f http://localhost:8080/ || exit 1
 WORKDIR /
 
 # Install S3 client
-CMD apt-get update && \
-    apt-get install -y python-pip
-
-CMD pip install boto3 awscli
+RUN apt-get update && \
+    apt-get install -y python-pip && \
+    pip install boto3
 
 COPY master.sh /
 COPY runTasks.py /

@@ -1,14 +1,14 @@
 #!/bin/bash
 
-#python runTasks.py || exit 1
+python runTasks.py || exit 1
 
-#if curl --fail -X POST --output /dev/null --silent --head http://127.0.0.1:8080; then
+if curl --fail -X POST --output /dev/null --silent --head http://127.0.0.1:8080; then
      printf 'Waiting for spark...'
      until $(curl --output /dev/null --silent --head --fail http://127.0.0.1:8080); do
           printf '.'
           sleep 5
      done
-#fi
+fi
 
 java -cp /apps/spark/conf:/apps/spark/jars/* \
      -Xmx512m org.apache.spark.deploy.SparkSubmit \
