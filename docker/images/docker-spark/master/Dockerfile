@@ -6,8 +6,9 @@ WORKDIR /
 
 # Install S3 client
 CMD apt-get update && \
-    apt-get install -y python-pip && \
-    pip install boto3 awscli
+    apt-get install -y python-pip
+
+CMD pip install boto3 awscli
 
 COPY master.sh /
 COPY runTasks.py /
