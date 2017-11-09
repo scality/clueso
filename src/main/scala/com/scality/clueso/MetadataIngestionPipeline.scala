@@ -6,7 +6,7 @@ import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.streaming.{GroupState, OutputMode, ProcessingTime}
+import org.apache.spark.sql.streaming.{OutputMode, ProcessingTime}
 import org.apache.spark.sql.types.TimestampType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -138,18 +138,6 @@ object MetadataIngestionPipeline extends LazyLogging {
       df.drop("event")
   }
 
-  def stateFun(recordNo: Long, it: Iterator[Long], state: GroupState[List[Long]]): Option[Long] = {
-    if (!state.hasTimedOut) {
-      if (state.getOption.isEmpty) {
-        state.update(List[Long](recordNo))
-      } else {
-        state.update(state.get ++ List(recordNo))
-      }
-    }
-
-    Some(recordNo)
-  }
-
   def main(args: Array[String]): Unit = {
     require(args.length > 0, "specify configuration file")
 
@@ -169,8 +157,6 @@ object MetadataIngestionPipeline extends LazyLogging {
       .appName("Metadata Ingestion Pipeline")
       .getOrCreate()
 
-    import spark.implicits._
-
     //    val mergerService = new MergeService(spark, config)
 
     val eventStream = spark.readStream
@@ -184,47 +170,16 @@ object MetadataIngestionPipeline extends LazyLogging {
 
     val filteredEventsDf = filterAndParseEvents(config.bucketName, eventStream)
 
-    val compactionRecordInterval = config.compactionRecordInterval
-    val compactionTriggerDf = filteredEventsDf
-      .select(col("opIndex"))
-      .as[String]
-      .flatMap(value => {
-        val recordNo = value.substring(0, 12).toLong
-
-        if (recordNo > 0 && recordNo % compactionRecordInterval == 0) {
-          Some(recordNo)
-        } else {
-          None
-        }
-      })
-
-
-    compactionTriggerDf
-      .groupByKey(x => x)
-      .mapGroupsWithState[List[Long], Option[Long]](stateFun _)
-      .foreach(recordNo => {
-        logger.info(s" TRIGGER: ${recordNo}")
-      })
-
     val writeStream = filteredEventsDf.writeStream
       .trigger(ProcessingTime(config.triggerTime.toMillis))
-
 
     val query = writeStream
       .option("checkpointLocation", config.checkpointUrl)
       .format("parquet")
-      .partitionBy("bucket")
+      .partitionBy("bucket", "maxOpIndex")
       .outputMode(OutputMode.Append())
       .option("path", PathUtils.landingURI)
       .start()
-
-    // TODO reimplement this with state
-
-//    compactionTriggerDf.collect.foreach(recordNo => {
-//      // trigger compaction async
-//      logger.info(s"Compaction trigger for recordNo = ${recordNo}")
-//      // TODO
-//    })
 
     query.awaitTermination()
   }
