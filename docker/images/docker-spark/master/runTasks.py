@@ -6,12 +6,12 @@ session = boto3.session.Session()
 
 s3 = session.client(
     service_name='s3',
-    endpoint_url='http://127.0.0.1',
+    endpoint_url='http://lb',
 )
 
 s3Resource = session.resource(
     service_name='s3',
-    endpoint_url='http://127.0.0.1',
+    endpoint_url='http://lb',
 )
 
 bucketName = "METADATA"

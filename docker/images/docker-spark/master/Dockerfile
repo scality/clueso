@@ -1,4 +1,4 @@
-FROM scality/spark-base:hadoop2.8
+FROM scality/spark-base:hadoop2.8-2.2
 
 HEALTHCHECK CMD curl -f http://localhost:8080/ || exit 1
 
@@ -11,7 +11,7 @@ RUN apt-get update && \
 
 COPY master.sh /
 COPY runTasks.py /
-COPY clueso.jar /
+
 ENV SPARK_MASTER_PORT 7077
 ENV SPARK_MASTER_WEBUI_PORT 8080
 ENV SPARK_MASTER_LOG /spark/logs
