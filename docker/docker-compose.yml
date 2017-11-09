@@ -1,5 +1,17 @@
 version: '3.1'
 services:
+  create-metadata-bucket:
+    image: jpbarto/boto3
+    volumes:
+      - ./images/docker-spark/master/runTasks.py:/runTasks.py
+    environment:
+      AWS_ACCESS_KEY_ID: accessKey1
+      AWS_SECRET_ACCESS_KEY: verySecretKey1
+    entrypoint: /usr/local/bin/python /runTasks.py
+    depends_on:
+      - lb
+
+
   s3-data:
     build: ./images/S3/
     ports:
