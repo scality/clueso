@@ -18,7 +18,7 @@ java -cp /spark/conf:/spark/jars/* \
      --conf spark.driver.cores=1 --conf spark.executor.cores=1 --class com.scality.clueso.MetadataIngestionPipeline \
      --name "Clueso Metadata Ingestion Pipeline" \
      --queue default file:///clueso/clueso.jar /clueso/application.conf \
-     --conf spark.cores.max=2
+     --conf spark.cores.max=2 &
 
 export SPARK_MASTER_IP=`hostname`
 
