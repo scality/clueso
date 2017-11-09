@@ -1,0 +1,4 @@
+[submodule "docker/images/S3"]
+	path = docker/images/S3
+	url = https://github.com/scality/S3.git
+	branch = ft/clueso-alluxio
