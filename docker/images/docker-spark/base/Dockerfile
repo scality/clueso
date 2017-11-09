@@ -8,6 +8,8 @@ ENV JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 ENV SPARK_VERSION 2.2.0_2.11
 
 COPY conf /spark/conf/ 
+COPY clueso.jar /clueso/
+COPY application.conf /clueso/
 
 RUN apt-get update \
     && apt-get install -y supervisor curl build-essential \
