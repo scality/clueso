@@ -11,7 +11,6 @@ RUN apt-get update && \
 
 COPY master.sh /
 COPY runTasks.py /
-COPY clueso.jar /
 ENV SPARK_MASTER_PORT 7077
 ENV SPARK_MASTER_WEBUI_PORT 8080
 ENV SPARK_MASTER_LOG /spark/logs

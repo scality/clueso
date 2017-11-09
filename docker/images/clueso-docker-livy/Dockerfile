@@ -35,8 +35,10 @@ RUN cd $LIVY_BUILD_PATH && git checkout $LIVY_BRANCH && mvn -DskipTests -Dspark.
 	mkdir -p $LIVY_APP_PATH/logs && \
 	mkdir -p /apps/spark-modules/
 
-# Add custom files, set permissions
-ADD entrypoint.sh .
+COPY conf /apps/livy/conf
+
+# Copy custom files, set permissions
+COPY entrypoint.sh .
 
 RUN chmod +x entrypoint.sh
 
