@@ -5,7 +5,7 @@ plugins {
 }
 
 group 'com.scality.clueso'
-version '1.0-SNAPSHOT'
+version version
 
 apply plugin: 'java'
 apply plugin: 'scala'
