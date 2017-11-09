@@ -2,7 +2,7 @@ FROM scality/spark-base:hadoop2.8
 
 # packages
 RUN apt-get update && apt-get install -yq --no-install-recommends --force-yes \
-    wget \
+    wget  \
     iproute2 \
     libsvn1 \
     libcurl3 \
@@ -45,4 +45,4 @@ RUN chmod +x entrypoint.sh
 # Expose port
 EXPOSE 8998 38600-38632 4040-4056 5005
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]

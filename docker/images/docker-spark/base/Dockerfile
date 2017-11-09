@@ -2,10 +2,10 @@ FROM java:openjdk-8-jdk
 MAINTAINER Vianney Rancurel <vr@scality.com>
 
 ENV HADOOP_VERSION 2.8.1
-ENV SPARK_BRANCH 2.2.0
+ENV SPARK_BRANCH 2.1.1
 ENV SPARK_HOME /spark/
 ENV JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-ENV SPARK_VERSION 2.2.0_2.11
+ENV SPARK_VERSION 2.1.1_2.11
 
 COPY conf /spark/conf/ 
 COPY clueso.jar /clueso/
@@ -22,6 +22,8 @@ RUN apt-get update \
     && tar -xvf /tmp/hadoop.tar.gz -C /opt/ \
     && rm /tmp/hadoop.tar.gz
 
+# once spark is packaged with hadoop 2.8 we can stop compiling
+# https://issues.apache.org/jira/browse/HADOOP-12963
 RUN mkdir -p /apps/build/ && \
     cd /apps/build/ && \
     git clone https://github.com/apache/spark.git && \
@@ -35,8 +37,5 @@ RUN cd /apps/build/spark-$SPARK_VERSION && /apps/build/spark-$SPARK_VERSION/dev/
 
 RUN tar -zxvf /apps/build/spark-$SPARK_VERSION/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION.tgz -C /tmp/ && mkdir -p $SPARK_HOME && cp -rf /tmp/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION/* $SPARK_HOME && \
     rm -rf -- /tmp/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION/
-
-RUN mkdir /clueso
-COPY clueso.jar /clueso/
 
 CMD bash
