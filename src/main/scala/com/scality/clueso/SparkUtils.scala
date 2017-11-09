@@ -32,6 +32,7 @@ object SparkUtils extends LazyLogging {
     c.set("fs.s3a.access.key", config.s3AccessKey)
     c.set("fs.s3a.secret.key", config.s3SecretKey)
     c.set("fs.s3a.path.style.access", config.s3PathStyleAccess)
+    c.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
 
     c
   }
@@ -49,6 +50,7 @@ object SparkUtils extends LazyLogging {
       .config("spark.hadoop.fs.s3a.secret.key", config.s3SecretKey)
       .config("spark.hadoop.fs.s3a.path.style.access", config.s3PathStyleAccess)
       .config("spark.sql.streaming.metricsEnabled", "true")
+      .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
   }
 
   def confSparkSession(spark : SparkSession, config : CluesoConfig) = {
@@ -63,6 +65,7 @@ object SparkUtils extends LazyLogging {
     spark.conf.set("spark.hadoop.fs.s3a.path.style.access", config.s3PathStyleAccess)
     spark.conf.set("fs.s3a.path.style.access", config.s3PathStyleAccess)
     spark.conf.set("spark.sql.streaming.metricsEnabled", "true")
+    spark.conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
   }
 
   import scala.util.parsing.json.JSONObject
@@ -76,23 +79,12 @@ object SparkUtils extends LazyLogging {
     val result = queryExecutor.execute(query)
 
     val resultArray = try {
-//      val results = result.take(query.limit)
-
       val jsonResults = result.toJSON.take(query.limit)
       if (jsonResults.size > 0) {
         jsonResults.map(_.replaceAll("`",""))
       } else {
         Array[String]()
       }
-
-//      if (results.nonEmpty) {
-//        results.map(row => {
-//          convertRowToJSON(row)
-//        })
-//      } else {
-//        Array[String]()
-//      }
-
     } catch {
       case e:IOException => {
         println(e)
