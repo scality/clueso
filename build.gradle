@@ -73,8 +73,6 @@ dependencies {
     // tools command line opt parsing
     compile group: 'org.rogach', name: 'scallop_2.11', version: '3.1.0'
 
-
-
     testCompile 'org.apache.spark:spark-sql_'+scalaVersion+':' + sparkVersion
     testCompile 'org.apache.spark:spark-streaming_'+scalaVersion+':' + sparkVersion
     testCompile 'org.apache.spark:spark-core_'+scalaVersion+':' + sparkVersion

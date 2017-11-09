@@ -1,248 +1,66 @@
 buildscript {
     repositories {
         jcenter()
+
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
     }
 
     dependencies {
         classpath 'com.bmuschko:gradle-docker-plugin:3.1.0'
+        classpath "com.avast.gradle:gradle-docker-compose-plugin:0.6.1"
     }
 }
 
-// use fully qualified class name
+apply plugin: com.avast.gradle.dockercompose.DockerComposePlugin
+
+dockerCompose.isRequiredBy(test)
+
+dockerCompose {
+    useComposeFiles = ['docker/docker-compose.yml']
+}
+
+test.doFirst {
+
+
+    // exposes "${serviceName}_HOST" and "${serviceName}_TCP_${exposedPort}" environment variables
+    // for example exposes "WEB_HOST" and "WEB_TCP_80" environment variables for service named `web` with exposed port `80`
+    // if service is scaled using scale option, environment variables will be exposed for each service instance like "WEB_1_HOST", "WEB_1_TCP_80", "WEB_2_HOST", "WEB_2_TCP_80" and so on
+    dockerCompose.exposeAsEnvironment(test)
+    // exposes "${serviceName}.host" and "${serviceName}.tcp.${exposedPort}" system properties
+    // for example exposes "web.host" and "web.tcp.80" system properties for service named `web` with exposed port `80`
+    // if service is scaled using scale option, environment variables will be exposed for each service instance like "web_1.host", "web_1.tcp.80", "web_2.host", "web_2.tcp.80" and so on
+    dockerCompose.exposeAsSystemProperties(test)
+    // get information about container of service `web` (declared in docker-compose.yml)
+}
+
+
 apply plugin: com.bmuschko.gradle.docker.DockerRemoteApiPlugin
 
-import com.bmuschko.gradle.docker.tasks.container.*
 import com.bmuschko.gradle.docker.tasks.image.*
-
-/********
- * PULL *
- ********/
-
-task pullS3Image(type: DockerPullImage) {
-    repository = "scality/s3server"
-    tag = "latest"
-}
-
-/*********
- * BUILD *
- *********/
-
-task buildAlluxioImage(type: DockerBuildImage) {
-    inputDir = file('docker/images/alluxio')
-    tag = 'scality/alluxio:latest'
-}
-
 
 task buildGraphiteImage(type: DockerBuildImage) {
     inputDir = file('docker/images/grafana_graphite')
     tag = 'scality/grafana_graphite:latest'
 }
 
-
 task buildLivyImage(type: DockerBuildImage) {
     inputDir = file('docker/images/clueso-docker-livy')
     tag = 'scality/clueso-livy:0.4.0-alluxio'
 }
 
+//buildLivyImage.isRequiredBy(dockerCompose)
+
 task builSparkBaseImage(type: DockerBuildImage) {
     inputDir = file('docker/images/docker-spark/base')
-    tag = 'scality/spark-base:hadoop2.8'
-}
-
-task builSparkMasterImage(type: DockerBuildImage) {
-    dependsOn builSparkBaseImage
-    inputDir = file('docker/images/docker-spark/master')
-    tag = 'scality/spark-master:2.1.1-hadoop28'
-}
-
-task buildSparkWorkerImage(type: DockerBuildImage) {
-    dependsOn builSparkBaseImage
-    inputDir = file('docker/images/docker-spark/worker')
-    tag = 'scality/spark-worker:2.1.1-hadoop28-alluxio'
+    tag = 'scality/spark-base:hadoop2.8-2.2'
 }
 
 
-/**********
- * CREATE *
- **********/
-
-task createS3Container(type: DockerCreateContainer) {
-    dependsOn pullS3Image
-
-    targetImageId { 'scality/s3server:latest' }
-    portBindings = [ '8000:8000']
-
-    env = [
-    'SCALITY_ACCESS_KEY_ID=accessKey1',
-    'SCALITY_SECRET_ACCESS_KEY=verySecretKey1']
+dockerCompose.doFirst {
+    builSparkBaseImage
+    buildGraphiteImage
 }
 
-task createGraphiteContainer(type: DockerCreateContainer) {
-    dependsOn buildGraphiteImage
-
-    targetImageId { 'kamon/grafana_graphite:latest' }
-    portBindings = [ '8080:80',
-                     '8081:81',
-                     '8125:8125/udp',
-                     '8126:8126',
-                     '2003:2003',
-                     '2004:2004',
-                     '7002:7002',
-                     '3000:3000']
-
-}
-
-
-task createAlluxioMasterContainer(type: DockerCreateContainer) {
-    dependsOn buildAlluxioImage
-    targetImageId { buildAlluxioImage.getImageId() }
-
-    doFirst {
-        mkdir 'tmp/docker/underStorage'
-    }
-
-    portBindings = [ '19998:19998',
-                     '19999:19999' ]
-
-    env = [ 'ALLUXIO_UNDERFS_ADDRESS=/underStorage',
-            'ALLUXIO_MASTER_HOSTNAME=localhost' ]
-    volumes = [
-            "./tmp/docker/underStorage:/underStorage" ]
-
-
-    cmd = [ 'master' ]
-}
-
-task createSparkMasterContainer(type: DockerCreateContainer) {
-    dependsOn builSparkMasterImage
-    dependsOn createGraphiteContainer
-    targetImageId { buildSparkWorkerImage.getImageId() }
-
-
-    // TODO test
-    links = [ createGraphiteContainer.getImageId()+':graphite']
-
-    portBindings = ['8070:8080', '7077:7077']
-}
-
-task createSparkWorkerContainer(type: DockerCreateContainer) {
-    dependsOn buildSparkWorkerImage
-    dependsOn createGraphiteContainer
-    dependsOn createSparkMasterContainer
-    dependsOn createAlluxioMasterContainer
-
-    targetImageId { buildSparkWorkerImage.getImageId() }
-
-    links = [
-        createGraphiteContainer.getImageId()+':graphite',
-        createSparkMasterContainer.getImageId()+':spark-master',
-        createAlluxioMasterContainer.getImageId()+':alluxio-master'
-    ]
-
-    portBindings = ['30000:30000', '8071:8081']
-
-    env = [
-        'SPARK_MASTER=spark://spark-master:7077',
-        'ALLUXIO_UNDERFS_ADDRESS=/underStorage',
-        'ALLUXIO_MASTER_HOSTNAME=alluxio-master'
-    ]
-}
-
-/*********
- * START *
- *********/
-
-task startS3Container(type: DockerStartContainer) {
-    dependsOn createS3Container
-    targetContainerId { createS3Container.getContainerId() }
-
-    doLast {
-        project.logger.lifecycle('Waiting 10sec for S3 to come to live')
-        sleep(10000)
-    }
-}
-
-
-task startGraphiteContainer(type: DockerStartContainer) {
-    dependsOn createGraphiteContainer
-    targetContainerId { createGraphiteContainer.getContainerId() }
-}
-
-task startAlluxioMasterContainer(type: DockerStartContainer) {
-    dependsOn createAlluxioMasterContainer
-    // dependsOn pullAlluxioMasterImage
-    targetContainerId { createAlluxioMasterContainer.getContainerId() }
-}
-
-task startSparkMasterContainer(type: DockerStartContainer) {
-    dependsOn createSparkMasterContainer
-    targetContainerId { createSparkMasterContainer.getContainerId() }
-}
-
-task startSparkWorkerContainer(type: DockerStartContainer) {
-    dependsOn createSparkWorkerContainer
-    targetContainerId { createSparkWorkerContainer.getContainerId() }
-}
-
-/********
- * STOP *
- ********/
-
-task stopS3Container(type: DockerStopContainer) {
-    targetContainerId { createS3Container.getContainerId() }
-}
-
-task stopGraphiteContainer(type: DockerStopContainer) {
-    targetContainerId { createGraphiteContainer.getContainerId() }
-}
-
-task stopAlluxioMasterContainer(type: DockerStopContainer) {
-    targetContainerId { startAlluxioMasterContainer.getContainerId() }
-}
-
-task stopSparkMasterContainer(type: DockerStopContainer) {
-    targetContainerId { createSparkMasterContainer.getContainerId() }
-}
-
-task stopSparkWorkerContainer(type: DockerStopContainer) {
-    targetContainerId { createSparkWorkerContainer.getContainerId() }
-}
-
-
-/**********
- * REMOVE *
- **********/
-
-task removeGraphiteContainer(type: DockerRemoveContainer) {
-    dependsOn stopGraphiteContainer
-    targetContainerId { stopGraphiteContainer.getContainerId() }
-    force = true
-}
-
-task removeAlluxioMasterContainer(type: DockerRemoveContainer) {
-    dependsOn stopAlluxioMasterContainer
-    targetContainerId { stopAlluxioMasterContainer.getContainerId() }
-    force = true
-}
-
-task removeS3Container(type: DockerRemoveContainer) {
-    dependsOn stopS3Container
-    targetContainerId { stopS3Container.getContainerId() }
-    force = true
-}
-
-
-
-task integrationTest(type: Test) {
-    dependsOn startS3Container
-    dependsOn startGraphiteContainer
-    dependsOn startAlluxioMasterContainer
-//    dependsOn startSparkWorkerContainer
-
-//    finalizedBy stopSparkWorkerContainer
-//    finalizedBy stopSparkMasterContainer
-    finalizedBy removeAlluxioMasterContainer
-    finalizedBy removeGraphiteContainer
-    finalizedBy removeS3Container
-}
 
