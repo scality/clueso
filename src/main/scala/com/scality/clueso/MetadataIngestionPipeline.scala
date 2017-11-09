@@ -69,8 +69,6 @@ object MetadataIngestionPipeline extends LazyLogging {
   val msgRewriteFun = (bytes: Array[Byte]) =>
     EventMessageRewriterWrapper.deser.rewriteMsg(bytes)
 
-//  val compactionRecordInterval = config.compactionRecordInterval
-
   val maxOpIndexFun = (compactionRecordInterval:Long, value : String) => {
     val recordNo = value.substring(0, 12).toLong
 
@@ -133,8 +131,6 @@ object MetadataIngestionPipeline extends LazyLogging {
         !col("bucket").eqNullSafe("__metastore") &&
         (col("bucket").isNotNull && !col("bucket").startsWith("mpuShadowBucket")))
 
-//      df = df.filter(!col("bucket").eqNullSafe(bucketNameToFilterOut))
-
       df.drop("event")
   }
 
@@ -156,8 +152,6 @@ object MetadataIngestionPipeline extends LazyLogging {
     implicit val spark = SparkUtils.buildSparkSession(config)
       .appName("Metadata Ingestion Pipeline")
       .getOrCreate()
-
-    //    val mergerService = new MergeService(spark, config)
 
     val eventStream = spark.readStream
       .format("kafka")
