@@ -97,7 +97,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
         // given we apply merge
         val merger = new TableFilesCompactor(spark, config)
-        merger.compactLandingPartition("bucket", randomBucketName, 1)
+        merger.compactLandingPartition("bucket", randomBucketName, 1, true)
 
         // then, landing should be empty
         fs.listStatus(new Path(config.landingPathUri, s"bucket=$randomBucketName"),
