@@ -1,4 +1,4 @@
-FROM scality/spark-base:hadoop2.8-2.2
+FROM scality/spark-base:hadoop2.8
 
 HEALTHCHECK CMD curl -f http://localhost:8080/ || exit 1
 

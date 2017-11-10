@@ -35,13 +35,15 @@ RUN cd $LIVY_BUILD_PATH && git checkout $LIVY_BRANCH && mvn -DskipTests -Dspark.
 	mkdir -p $LIVY_APP_PATH/logs && \
 	mkdir -p /apps/spark-modules/
 
+RUN ln -s /spark /apps/spark
 COPY conf /apps/livy/conf
+COPY conf/log4j.properties /apps/spark/conf/log4j.properties
 
 # Copy custom files, set permissions
 COPY entrypoint.sh .
 
 RUN chmod +x entrypoint.sh
-
+#RUN ls -la /apps/livy/jars/
 # Expose port
 EXPOSE 8998 38600-38632 4040-4056 5005
 
