@@ -2,13 +2,13 @@ package com.scality.clueso.tools
 
 import java.io.File
 
-import com.scality.clueso.merge.TableFilesCompactor
+import com.scality.clueso.compact.TableFilesCompactor
 import com.scality.clueso.{CluesoConfig, SparkUtils}
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.LazyLogging
 import org.rogach.scallop._
 
-object MetadataTableMergerTool extends LazyLogging {
+object MetadataTableCompactorTool extends LazyLogging {
 
   class ToolConf(arguments: Seq[String]) extends ScallopConf(arguments) {
     val applicationConfFile = trailArg[String](required = true, descr = "application configuration file")
@@ -29,7 +29,7 @@ object MetadataTableMergerTool extends LazyLogging {
 
     val spark = SparkUtils.buildSparkSession(config)
       .master("local[*]")
-      .appName("Table Files Merger")
+      .appName("Table Files Compactor")
       .getOrCreate()
 
 
@@ -38,7 +38,7 @@ object MetadataTableMergerTool extends LazyLogging {
     if (toolConfig.bucket.supplied) {
       merger.compactLandingPartition("bucket", toolConfig.bucket.apply(), toolConfig.numPartitions.apply(), false)
     } else {
-      merger.merge(toolConfig.numPartitions.apply(), false)
+      merger.compact(toolConfig.numPartitions.apply(), false)
     }
   }
 }

@@ -81,7 +81,6 @@ object MetadataIngestionPipeline extends LazyLogging {
 
   import org.apache.spark.sql.functions.udf
   val msg_rewrite = udf(msgRewriteFun)
-
   val max_op_index = udf(maxOpIndexFun)
 
   /**

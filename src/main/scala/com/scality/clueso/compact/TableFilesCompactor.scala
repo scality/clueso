@@ -1,4 +1,4 @@
-package com.scality.clueso.merge
+package com.scality.clueso.compact
 
 import java.util.Date
 
@@ -7,14 +7,15 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.fs.{Path, PathFilter}
 import org.apache.spark.sql._
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions.{col, dense_rank}
+import org.apache.spark.sql.functions.{col, dense_rank, lit}
+import org.apache.spark.sql.types.LongType
 
 class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfig) extends LazyLogging {
   val fs = SparkUtils.buildHadoopFs(config)
   val partDirnamePattern = "([A-Za-z0-9_]+)=(.*)".r
   val dateFormat = new java.text.SimpleDateFormat("yyyyMMdd_hhmmss")
 
-  def merge(numPartitions: Int, force: Boolean): Unit = {
+  def compact(numPartitions: Int, force: Boolean): Unit = {
     // go through all partitions and see which ones are eligible for merging
     val landingPartitionsIt = fs.listStatus(new Path(PathUtils.landingURI)).iterator
 
@@ -106,8 +107,6 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
   def compactLandingPartition(partitionColumnName: String, partitionValue: String, numPartitions: Int, force: Boolean) = {
     println(s"Merging partition $partitionColumnName=$partitionValue into $numPartitions files")
 
-    val outputPath = s"${PathUtils.stagingURI}/$partitionColumnName=$partitionValue"
-
     val lockFilePath = lockPath()
 
     if (acquireLock(lockFilePath)) {
@@ -120,13 +119,16 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
 
         if (subPartToCompact.nonEmpty) {
 
-          val data = spark.read
-            .schema(CluesoConstants.storedEventSchema)
-            .parquet(landingPartitionPath)
-            .where(col("maxOpIndex").isin(subPartToCompact))
+          var data = spark.read
+            .schema(CluesoConstants.storedEventSchema
+              .add("maxOpIndex", LongType)
+            )
+            .parquet(PathUtils.landingURI)
+            .where(col(partitionColumnName) === lit(partitionValue))
+            .where(col("maxOpIndex").isin(subPartToCompact: _*))
 
           // window function over union of partitions bucketName=<specified bucketName>
-          val windowSpec = Window.partitionBy("key").orderBy(col("kafkaTimestamp").desc)
+          val windowSpec = Window.partitionBy("bucket","key").orderBy(col("kafkaTimestamp").desc)
 
           data.coalesce(numPartitions)
             .withColumn("rank", dense_rank().over(windowSpec))
@@ -135,7 +137,7 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
             .write
             .partitionBy("bucket", "maxOpIndex")
             .mode(SaveMode.Append)
-            .parquet(outputPath)
+            .parquet(PathUtils.stagingURI)
         }
 
         logger.info(s"Waiting ${config.landingPurgeTolerance.toMillis}ms before purging compacted partitions")
