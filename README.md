@@ -1,44 +1,65 @@
 Clueso
 ======
 
+Instructions
+------------
 
-Build Clueso Tools
-------------------
+To build, run:
+
+`./gradlew clean shadowJar -x test`
+
+To run integration tests – requires Docker:
+
+`./gradlew clean test`
+
+
+
+Clueso Tool
+===========
 
 To build Clueso Tool, invoke:
 
 `./gradlew buildTool`
 
-Tool will be available under ./dist/tool.
+Tool scripts will be available under ./dist/tool
+
+
+Table Compactor Tool
+--------------------
+
+**Parameters**
+
+1. path to `application.conf`, that specifies S3 connection settings and compaction settings  
+2. number of partitions – set this value to the same as number of spark executors
+
+**Run Example**
+
+Run compaction with 20:
+
+`./table-compactor.sh application.conf 20` 
+
+**Add it to Cronjob**
+
+To run compaction every 24 hours at 1AM:
+
+Run `crontab -e` and select your editor:
+
+Add this to the file
+
+```
+0 1 * * * `./table-compactor.sh application.conf 5`
+```
+
+**Compact a specific bucket**
+
+To run compaction on a specific bucket:
+
+`./table-compactor.sh application.conf 20 myFatBucket`
 
 
 
-Table Merger Tool
------------------
-
-To merge a bucket into a specified number of partitions:
- 
-`./table-merger.sh <path/to/application.conf> <bucket name> <num partitions>`  
-
-
-To check eligibility to merge:
-
-`./table-merger.sh <path/to/application.conf> <bucket name> -t`
-
-
-Cache Tool
+Stats Tool
 ----------
-
-This tool can check for locks in the cache layer (Alluxio). 
- 
-`./cache-tool.sh <application.conf> <operation> <op args>`
-
-Operations:
- - `lockdel <bucketName>` – Deletes the lock files for /bucketName/ cache computation
-
-
-Storage Tool
-------------
 
 This tool can report on the number of search metadata files in persistent layer (S3).
 This includes average file size of Parquet files, number of records in metadata for a specific bucket and 
