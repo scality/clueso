@@ -21,7 +21,7 @@ object SparkUtils extends LazyLogging {
   }
 
   def buildHadoopFs(config: CluesoConfig) = {
-    FileSystem.get(new URI(config.mergePath), hadoopConfig(config))
+    FileSystem.get(new URI(PathUtils.landingURI(config)), hadoopConfig(config))
   }
 
   def hadoopConfig(config: CluesoConfig): HadoopConfig = {

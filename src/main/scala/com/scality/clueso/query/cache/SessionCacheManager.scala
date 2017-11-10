@@ -37,7 +37,7 @@ object SessionCacheManager extends LazyLogging {
       bucketDf
     } else {
       // cache exists
-      if (bucketUpdateTs(bucketName).plus(config.mergeFrequency.toMillis).isBeforeNow) {
+      if (bucketUpdateTs(bucketName).plus(config.cacheExpiry.toMillis).isBeforeNow) {
         // check if there's a dataframe update going on
         if (acquireLock(bucketName)) {
 

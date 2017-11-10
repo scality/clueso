@@ -2,7 +2,7 @@ package com.scality.clueso.tools
 
 import java.io.File
 
-import com.scality.clueso.merge.TableFilesMerger
+import com.scality.clueso.merge.TableFilesCompactor
 import com.scality.clueso.{CluesoConfig, SparkUtils}
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.LazyLogging
@@ -12,9 +12,8 @@ object MetadataTableMergerTool extends LazyLogging {
 
   class ToolConf(arguments: Seq[String]) extends ScallopConf(arguments) {
     val applicationConfFile = trailArg[String](required = true, descr = "application configuration file")
-    val checkEligibility = opt[Boolean](short = 't', descr = "test merge eligibility", required = false)
-    val bucket = trailArg[String]()
-    val numPartitions = trailArg[Int](required = false)
+    val numPartitions = trailArg[Int](required = true)
+    val bucket = trailArg[String](required = false)
     verify()
   }
 
@@ -34,17 +33,12 @@ object MetadataTableMergerTool extends LazyLogging {
       .getOrCreate()
 
 
-    val merger = new TableFilesMerger(spark, config)
+    val merger = new TableFilesCompactor(spark, config)
 
-    if (toolConfig.checkEligibility.getOrElse(false)) {
-      merger.checkMergeEligibility(toolConfig.bucket.apply())
+    if (toolConfig.bucket.supplied) {
+      merger.compactLandingPartition("bucket", toolConfig.bucket.apply(), toolConfig.numPartitions.apply(), false)
     } else {
-      if (!toolConfig.numPartitions.supplied) {
-        logger.error("Num Partitions required.")
-      } else {
-        merger.mergePartition("bucket", toolConfig.bucket.apply(), toolConfig.numPartitions.apply())
-      }
-
+      merger.merge(toolConfig.numPartitions.apply(), false)
     }
   }
 }

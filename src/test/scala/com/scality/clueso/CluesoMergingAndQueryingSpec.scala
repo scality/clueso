@@ -4,13 +4,13 @@ import java.io.File
 import java.sql.Timestamp
 
 import com.amazonaws.services.s3.S3ClientOptions
-import com.scality.clueso.merge.TableFilesMerger
+import com.scality.clueso.merge.TableFilesCompactor
 import com.scality.clueso.query.{MetadataQuery, MetadataQueryExecutor}
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.fs.s3a.BasicAWSCredentialsProvider
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.scalatest.{Assertions, Matchers, WordSpec}
 
 import scala.util.Random
@@ -25,7 +25,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
         implicit val _config = config
 
         val fs = SparkUtils.buildHadoopFs(config)
-        fs.mkdirs(new Path(config.stagingPath))
+        fs.mkdirs(new Path(config.stagingPathUri))
 
         val now = new java.util.Date().getTime
 
@@ -41,7 +41,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
         val stream = MetadataIngestionPipeline.filterAndParseEvents(config.bucketName, landingDf)
         stream.write
           .partitionBy("bucket", "maxOpIndex")
-          .parquet(config.landingPath)
+          .parquet(config.landingPathUri)
 
         val queryExecutor = MetadataQueryExecutor(spark, config)
 
@@ -64,7 +64,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
         implicit val _config = config
 
         val fs = SparkUtils.buildHadoopFs(config)
-        fs.mkdirs(new Path(config.stagingPath))
+        fs.mkdirs(new Path(config.stagingPathUri))
 
         val now = new java.util.Date().getTime
         val randomBucketName = s"testbucket${Random.nextInt(10000)}"
@@ -80,7 +80,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
         val stream = MetadataIngestionPipeline.filterAndParseEvents(config.bucketName, landingDf)
         stream.write
           .partitionBy("bucket", "maxOpIndex")
-          .parquet(config.landingPath)
+          .parquet(config.landingPathUri)
 
         val queryExecutor = MetadataQueryExecutor(spark, config)
 
@@ -96,11 +96,11 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
         maybeB.getString(maybeB.fieldIndex("key")) shouldEqual "b"
 
         // given we apply merge
-        val merger = new TableFilesMerger(spark, config)
-        merger.mergePartition("bucket", randomBucketName, 1)
+        val merger = new TableFilesCompactor(spark, config)
+        merger.compactLandingPartition("bucket", randomBucketName, 1)
 
         // then, landing should be empty
-        fs.listStatus(new Path(config.landingPath, s"bucket=$randomBucketName"),
+        fs.listStatus(new Path(config.landingPathUri, s"bucket=$randomBucketName"),
           SparkUtils.parquetFilesFilter).length shouldEqual 0
 
         // given we query again (hits staging)
@@ -113,69 +113,69 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
         maybeB.getString(maybeB.fieldIndex("key")) shouldEqual "b"
     }
 
-//    "Scenario 3: not return entries in staging that are marked as deleted in landing" in withSparkContext {
-//      (spark, config) =>
-//
-//        import spark.implicits._
-//        implicit val _spark = spark
-//        implicit val _config = config
-//
-//        val now = new java.util.Date().getTime
-//        val randomBucketName = s"testbucket${Random.nextInt(10000)}"
-//
-//        val landingData = Seq(
-//          (new Timestamp(now + 2000), """{"opIndex":"000000000003_000000","type":"put","bucket":"""" + randomBucketName + """","key":"fun","value":"{ \"md-model-version\":3,\"owner-display-name\":\"CustomAccount\",\"owner-id\":\"12349df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47qwer\",\"content-length\":13,\"last-modified\":\"2017-08-08T03:57:04.249Z\",\"content-md5\":\"4b02d12ad7f063d67aec9dc2116a57a2\",\"x-amz-version-id\":\"null\",\"x-amz-server-version-id\":\"\",\"x-amz-storage-class\":\"STANDARD\",\"x-amz-server-side-encryption\":\"\",\"x-amz-server-side-encryption-aws-kms-key-id\":\"\",\"x-amz-server-side-encryption-customer-algorithm\":\"\",\"x-amz-website-redirect-location\":\"\",\"acl\":{\"Canned\":\"private\",\"FULL_CONTROL\":[],\"WRITE_ACP\":[],\"READ\":[],\"READ_ACP\":[]},\"key\":\"\",\"location\":[{\"key\":\"12cb0b112d663e73effb32c58fe3fab9f4bd002c\",\"size\":13,\"start\":0,\"dataStoreName\":\"file\",\"dataStoreETag\":\"1:4b02d12ad7f063d67aec9dc2116a57a2\"}],\"isDeleteMarker\":false,\"tags\":{},\"replicationInfo\":{\"status\":\"\",\"content\":[],\"destination\":\"\",\"storageClass\":\"\",\"role\":\"\"},\"dataStoreName\":\"us-east-1\", \"x-amz-meta-verymeta\":\"2\",\"x-amz-meta-color\":\"blue\",\"x-amz-meta-dog\":\"retriever\",\"x-amz-meta-more\":\"morefun\",\"x-amz-meta-words\":\"runningout\",\"x-amz-meta-evenmore\":\"evenmorefun\",\"x-amz-meta-keepitup\":\"5\",\"x-amz-meta-mymeta1\":\"thisisfun\",\"x-amz-meta-mymeta2\":\"thisisfun2\"}"}"""),
-//          (new Timestamp(now + 1000), """{"opIndex":"000000000002_000000","type":"delete","bucket":"""" + randomBucketName + """","key":"fun","value":"{ \"md-model-version\":3,\"owner-display-name\":\"CustomAccount\",\"owner-id\":\"12349df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47qwer\",\"content-length\":13,\"last-modified\":\"2017-08-08T03:57:03.249Z\",\"content-md5\":\"4b02d12ad7f063d67aec9dc2116a57a2\",\"x-amz-version-id\":\"null\",\"x-amz-server-version-id\":\"\",\"x-amz-storage-class\":\"STANDARD\",\"x-amz-server-side-encryption\":\"\",\"x-amz-server-side-encryption-aws-kms-key-id\":\"\",\"x-amz-server-side-encryption-customer-algorithm\":\"\",\"x-amz-website-redirect-location\":\"\",\"acl\":{\"Canned\":\"private\",\"FULL_CONTROL\":[],\"WRITE_ACP\":[],\"READ\":[],\"READ_ACP\":[]},\"key\":\"\",\"location\":[{\"key\":\"12cb0b112d663e73effb32c58fe3fab9f4bd002c\",\"size\":13,\"start\":0,\"dataStoreName\":\"file\",\"dataStoreETag\":\"1:4b02d12ad7f063d67aec9dc2116a57a2\"}],\"isDeleteMarker\":false,\"tags\":{},\"replicationInfo\":{\"status\":\"\",\"content\":[],\"destination\":\"\",\"storageClass\":\"\",\"role\":\"\"},\"dataStoreName\":\"us-east-1\", \"x-amz-meta-verymeta\":\"2\",\"x-amz-meta-color\":\"blue\",\"x-amz-meta-dog\":\"retriever\",\"x-amz-meta-more\":\"morefun\",\"x-amz-meta-words\":\"runningout\",\"x-amz-meta-evenmore\":\"evenmorefun\",\"x-amz-meta-keepitup\":\"5\",\"x-amz-meta-mymeta1\":\"thisisfun\",\"x-amz-meta-mymeta2\":\"thisisfun2\"}"}""")
-//        )
-//
-//        val stagingData = Seq(
-//          (new Timestamp(now), """{"opIndex":"000000000001_000000","type":"put","bucket":"""" + randomBucketName + """","key":"fun","value":"{ \"md-model-version\":3,\"owner-display-name\":\"CustomAccount\",\"owner-id\":\"12349df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47qwer\",\"content-length\":13,\"last-modified\":\"2017-08-08T03:57:02.249Z\",\"content-md5\":\"4b02d12ad7f063d67aec9dc2116a57a2\",\"x-amz-version-id\":\"null\",\"x-amz-server-version-id\":\"\",\"x-amz-storage-class\":\"STANDARD\",\"x-amz-server-side-encryption\":\"\",\"x-amz-server-side-encryption-aws-kms-key-id\":\"\",\"x-amz-server-side-encryption-customer-algorithm\":\"\",\"x-amz-website-redirect-location\":\"\",\"acl\":{\"Canned\":\"private\",\"FULL_CONTROL\":[],\"WRITE_ACP\":[],\"READ\":[],\"READ_ACP\":[]},\"key\":\"\",\"location\":[{\"key\":\"12cb0b112d663e73effb32c58fe3fab9f4bd002c\",\"size\":13,\"start\":0,\"dataStoreName\":\"file\",\"dataStoreETag\":\"1:4b02d12ad7f063d67aec9dc2116a57a2\"}],\"isDeleteMarker\":false,\"tags\":{},\"replicationInfo\":{\"status\":\"\",\"content\":[],\"destination\":\"\",\"storageClass\":\"\",\"role\":\"\"},\"dataStoreName\":\"us-east-1\", \"x-amz-meta-verymeta\":\"2\",\"x-amz-meta-color\":\"blue\",\"x-amz-meta-dog\":\"retriever\",\"x-amz-meta-more\":\"morefun\",\"x-amz-meta-words\":\"runningout\",\"x-amz-meta-evenmore\":\"evenmorefun\",\"x-amz-meta-keepitup\":\"5\",\"x-amz-meta-mymeta1\":\"thisisfun\",\"x-amz-meta-mymeta2\":\"thisisfun2\"}"}""")
-//        )
-//
-//        // when we have Staging with putA , Landing with delA, putB
-//        val stagingDf = stagingData.toDF("timestamp", "value")
-//        var stream = MetadataIngestionPipeline.filterAndParseEvents(config.bucketName, stagingDf)
-//        stream.write
-//          .partitionBy("bucket", "maxOpIndex")
-//          .mode(SaveMode.Overwrite)
-//          .parquet(config.stagingPath)
-//
-//        val landingDf = landingData.toDF("timestamp", "value")
-//        stream = MetadataIngestionPipeline.filterAndParseEvents(config.bucketName, landingDf)
-//        stream.write
-//          .partitionBy("bucket")
-//          .mode(SaveMode.Overwrite)
-//          .parquet(config.landingPath)
-//
-//        val queryExecutor = MetadataQueryExecutor(spark, config)
-//
-//        // given
-//        val query = MetadataQuery(randomBucketName, "", None, 1000)
-//        var result = queryExecutor.execute(query)
-//
-//        // then
-//        result.count() shouldBe 1
-//
-//        var maybeB = result.take(1).head
-//        maybeB.getString(maybeB.fieldIndex("key")) shouldEqual "fun"
-//
-//        // given we apply merge
-//        val merger = new TableFilesMerger(spark, config)
-//        merger.mergePartition("bucket", "wednesday", 1)
-//
-//        // then, landing should be empty
-//        val fs = SparkUtils.buildHadoopFs(config)
-//        fs.listStatus(new Path(config.landingPath, s"bucket=$randomBucketName"), SparkUtils.parquetFilesFilter).length shouldEqual 0
-//
-//        // given we query again (hits staging)
-//        result = queryExecutor.execute(query)
-//
-//        // then same result as before
-//        result.count() shouldBe 1
-//
-//        maybeB = result.take(1).head
-//        maybeB.getString(maybeB.fieldIndex("key")) shouldEqual "fun"
-//    }
+    "Scenario 3: not return entries in staging that are marked as deleted in landing" in withSparkContext {
+      (spark, config) =>
+
+        import spark.implicits._
+        implicit val _spark = spark
+        implicit val _config = config
+
+        val now = new java.util.Date().getTime
+        val randomBucketName = s"testbucket${Random.nextInt(10000)}"
+
+        val landingData = Seq(
+          (new Timestamp(now + 2000), """{"opIndex":"000000000003_000000","type":"put","bucket":"""" + randomBucketName + """","key":"fun","value":"{ \"md-model-version\":3,\"owner-display-name\":\"CustomAccount\",\"owner-id\":\"12349df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47qwer\",\"content-length\":13,\"last-modified\":\"2017-08-08T03:57:04.249Z\",\"content-md5\":\"4b02d12ad7f063d67aec9dc2116a57a2\",\"x-amz-version-id\":\"null\",\"x-amz-server-version-id\":\"\",\"x-amz-storage-class\":\"STANDARD\",\"x-amz-server-side-encryption\":\"\",\"x-amz-server-side-encryption-aws-kms-key-id\":\"\",\"x-amz-server-side-encryption-customer-algorithm\":\"\",\"x-amz-website-redirect-location\":\"\",\"acl\":{\"Canned\":\"private\",\"FULL_CONTROL\":[],\"WRITE_ACP\":[],\"READ\":[],\"READ_ACP\":[]},\"key\":\"\",\"location\":[{\"key\":\"12cb0b112d663e73effb32c58fe3fab9f4bd002c\",\"size\":13,\"start\":0,\"dataStoreName\":\"file\",\"dataStoreETag\":\"1:4b02d12ad7f063d67aec9dc2116a57a2\"}],\"isDeleteMarker\":false,\"tags\":{},\"replicationInfo\":{\"status\":\"\",\"content\":[],\"destination\":\"\",\"storageClass\":\"\",\"role\":\"\"},\"dataStoreName\":\"us-east-1\", \"x-amz-meta-verymeta\":\"2\",\"x-amz-meta-color\":\"blue\",\"x-amz-meta-dog\":\"retriever\",\"x-amz-meta-more\":\"morefun\",\"x-amz-meta-words\":\"runningout\",\"x-amz-meta-evenmore\":\"evenmorefun\",\"x-amz-meta-keepitup\":\"5\",\"x-amz-meta-mymeta1\":\"thisisfun\",\"x-amz-meta-mymeta2\":\"thisisfun2\"}"}"""),
+          (new Timestamp(now + 1000), """{"opIndex":"000000000002_000000","type":"delete","bucket":"""" + randomBucketName + """","key":"fun","value":"{ \"md-model-version\":3,\"owner-display-name\":\"CustomAccount\",\"owner-id\":\"12349df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47qwer\",\"content-length\":13,\"last-modified\":\"2017-08-08T03:57:03.249Z\",\"content-md5\":\"4b02d12ad7f063d67aec9dc2116a57a2\",\"x-amz-version-id\":\"null\",\"x-amz-server-version-id\":\"\",\"x-amz-storage-class\":\"STANDARD\",\"x-amz-server-side-encryption\":\"\",\"x-amz-server-side-encryption-aws-kms-key-id\":\"\",\"x-amz-server-side-encryption-customer-algorithm\":\"\",\"x-amz-website-redirect-location\":\"\",\"acl\":{\"Canned\":\"private\",\"FULL_CONTROL\":[],\"WRITE_ACP\":[],\"READ\":[],\"READ_ACP\":[]},\"key\":\"\",\"location\":[{\"key\":\"12cb0b112d663e73effb32c58fe3fab9f4bd002c\",\"size\":13,\"start\":0,\"dataStoreName\":\"file\",\"dataStoreETag\":\"1:4b02d12ad7f063d67aec9dc2116a57a2\"}],\"isDeleteMarker\":false,\"tags\":{},\"replicationInfo\":{\"status\":\"\",\"content\":[],\"destination\":\"\",\"storageClass\":\"\",\"role\":\"\"},\"dataStoreName\":\"us-east-1\", \"x-amz-meta-verymeta\":\"2\",\"x-amz-meta-color\":\"blue\",\"x-amz-meta-dog\":\"retriever\",\"x-amz-meta-more\":\"morefun\",\"x-amz-meta-words\":\"runningout\",\"x-amz-meta-evenmore\":\"evenmorefun\",\"x-amz-meta-keepitup\":\"5\",\"x-amz-meta-mymeta1\":\"thisisfun\",\"x-amz-meta-mymeta2\":\"thisisfun2\"}"}""")
+        )
+
+        val stagingData = Seq(
+          (new Timestamp(now), """{"opIndex":"000000000001_000000","type":"put","bucket":"""" + randomBucketName + """","key":"fun","value":"{ \"md-model-version\":3,\"owner-display-name\":\"CustomAccount\",\"owner-id\":\"12349df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47qwer\",\"content-length\":13,\"last-modified\":\"2017-08-08T03:57:02.249Z\",\"content-md5\":\"4b02d12ad7f063d67aec9dc2116a57a2\",\"x-amz-version-id\":\"null\",\"x-amz-server-version-id\":\"\",\"x-amz-storage-class\":\"STANDARD\",\"x-amz-server-side-encryption\":\"\",\"x-amz-server-side-encryption-aws-kms-key-id\":\"\",\"x-amz-server-side-encryption-customer-algorithm\":\"\",\"x-amz-website-redirect-location\":\"\",\"acl\":{\"Canned\":\"private\",\"FULL_CONTROL\":[],\"WRITE_ACP\":[],\"READ\":[],\"READ_ACP\":[]},\"key\":\"\",\"location\":[{\"key\":\"12cb0b112d663e73effb32c58fe3fab9f4bd002c\",\"size\":13,\"start\":0,\"dataStoreName\":\"file\",\"dataStoreETag\":\"1:4b02d12ad7f063d67aec9dc2116a57a2\"}],\"isDeleteMarker\":false,\"tags\":{},\"replicationInfo\":{\"status\":\"\",\"content\":[],\"destination\":\"\",\"storageClass\":\"\",\"role\":\"\"},\"dataStoreName\":\"us-east-1\", \"x-amz-meta-verymeta\":\"2\",\"x-amz-meta-color\":\"blue\",\"x-amz-meta-dog\":\"retriever\",\"x-amz-meta-more\":\"morefun\",\"x-amz-meta-words\":\"runningout\",\"x-amz-meta-evenmore\":\"evenmorefun\",\"x-amz-meta-keepitup\":\"5\",\"x-amz-meta-mymeta1\":\"thisisfun\",\"x-amz-meta-mymeta2\":\"thisisfun2\"}"}""")
+        )
+
+        // when we have Staging with putA , Landing with delA, putB
+        val stagingDf = stagingData.toDF("timestamp", "value")
+        var stream = MetadataIngestionPipeline.filterAndParseEvents(config.bucketName, stagingDf)
+        stream.write
+          .partitionBy("bucket", "maxOpIndex")
+          .mode(SaveMode.Overwrite)
+          .parquet(config.stagingPathUri)
+
+        val landingDf = landingData.toDF("timestamp", "value")
+        stream = MetadataIngestionPipeline.filterAndParseEvents(config.bucketName, landingDf)
+        stream.write
+          .partitionBy("bucket")
+          .mode(SaveMode.Overwrite)
+          .parquet(config.landingPathUri)
+
+        val queryExecutor = MetadataQueryExecutor(spark, config)
+
+        // given
+        val query = MetadataQuery(randomBucketName, "", None, 1000)
+        var result = queryExecutor.execute(query)
+
+        // then
+        result.count() shouldBe 1
+
+        var maybeB = result.take(1).head
+        maybeB.getString(maybeB.fieldIndex("key")) shouldEqual "fun"
+
+        // given we apply merge
+        val merger = new TableFilesCompactor(spark, config)
+        merger.compactLandingPartition("bucket", randomBucketName, 1, true)
+
+        // then, landing should be empty
+        val fs = SparkUtils.buildHadoopFs(config)
+        fs.listStatus(new Path(config.landingPathUri, s"bucket=$randomBucketName"), SparkUtils.parquetFilesFilter).length shouldEqual 0
+
+        // given we query again (hits staging)
+        result = queryExecutor.execute(query)
+
+        // then same result as before
+        result.count() shouldBe 1
+
+        maybeB = result.take(1).head
+        maybeB.getString(maybeB.fieldIndex("key")) shouldEqual "fun"
+    }
 //
 //    "Scenario 4: pagination works" in withSparkContext {
 //      (spark, config) =>
@@ -393,8 +393,8 @@ trait SparkContextSetup extends LazyLogging {
       fs.create(bucketPath, true)
     }
 
-    fs.delete(new Path(config.stagingPath), true)
-    fs.delete(new Path(config.landingPath), true)
+    fs.delete(new Path(config.stagingPathUri), true)
+    fs.delete(new Path(config.landingPathUri), true)
 
     try
       testMethod(spark, config)
@@ -406,8 +406,8 @@ trait SparkContextSetup extends LazyLogging {
     finally {
       spark.stop()
 
-      fs.delete(new Path(config.stagingPath), true)
-      fs.delete(new Path(config.landingPath), true)
+      fs.delete(new Path(config.stagingPathUri), true)
+      fs.delete(new Path(config.landingPathUri), true)
     }
 
 
