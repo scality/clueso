@@ -45,7 +45,7 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
     }
   }
 
-  def getSubpartitionsToCompact(landingPartitionPath: String, force: Boolean): Array[String] = {
+  def getSubpartitionsToCompact(landingPartitionPath: String, force: Boolean): Array[Long] = {
     val subpartitionPaths = fs.listStatus(new Path(landingPartitionPath), new PathFilter {
       override def accept(path: Path): Boolean = {
         fs.isDirectory(path) && path.getName.matches(partDirnamePattern.pattern.pattern())
@@ -58,6 +58,7 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
         val regexMatch = partDirnamePattern.findFirstMatchIn(subpartDirName)
         regexMatch.map { rm => rm.group(2) }
       })
+      .map(_.toLong)
 
 
     // force = true – all values
@@ -66,7 +67,7 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
     //   subpartitions has 2+ values -> truncate the biggest one (assumes integer)
     if (!force) {
       subpartitionValues = if (subpartitionValues.length > 1) {
-        subpartitionValues.map(_.toInt).sorted.dropRight(1).map(_.toString)
+        subpartitionValues.sorted.dropRight(1)
       } else {
         // only one subpartition exist, so no compaction will occur
         Array()
@@ -76,12 +77,12 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
     subpartitionValues
   }
 
-  def removeSubpartitionsFromLanding(landingPartitionPath: String, subPartToCompact: Array[String]): Unit = {
+  def removeSubpartitionsFromLanding(landingPartitionPath: String, subPartToCompact: Array[Long]): Unit = {
     val subpartitionPaths = fs.listStatus(new Path(landingPartitionPath), new PathFilter {
       override def accept(path: Path): Boolean = {
         if (fs.isDirectory(path) && path.getName.matches(partDirnamePattern.pattern.pattern())) {
           val regexMatch = partDirnamePattern.findFirstMatchIn(path.getName)
-          regexMatch.foldLeft(false) { (v, rm) => v || subPartToCompact.contains(rm.group(2)) }
+          regexMatch.foldLeft(false) { (v, rm) => v || subPartToCompact.contains(rm.group(2).toLong) }
         } else {
           false
         }

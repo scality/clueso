@@ -143,7 +143,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
         val landingDf = landingData.toDF("timestamp", "value")
         stream = MetadataIngestionPipeline.filterAndParseEvents(config.bucketName, landingDf)
         stream.write
-          .partitionBy("bucket")
+          .partitionBy("bucket", "maxOpIndex")
           .mode(SaveMode.Overwrite)
           .parquet(config.landingPathUri)
 
@@ -165,7 +165,7 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
         // then, landing should be empty
         val fs = SparkUtils.buildHadoopFs(config)
-        fs.listStatus(new Path(config.landingPathUri, s"bucket=$randomBucketName"), SparkUtils.parquetFilesFilter).length shouldEqual 0
+        fs.listStatus(new Path(config.landingPathUri, s"bucket=$randomBucketName")).length shouldEqual 0
 
         // given we query again (hits staging)
         result = queryExecutor.execute(query)
