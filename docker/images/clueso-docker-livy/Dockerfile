@@ -1,6 +1,11 @@
 FROM scality/spark-base:hadoop2.8
 
 # packages
+
+# #something like this applicable anywhere?
+#     && apt-get autoremove --purge -y python git build-essential \
+
+
 RUN apt-get update && apt-get install -yq --no-install-recommends --force-yes \
     wget  \
     iproute2 \
@@ -43,6 +48,8 @@ COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
 # Expose port
+# check which ports actually need
+# don't expose what don't need.
 EXPOSE 8998 38600-38632 4040-4056 5005
 
 ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]

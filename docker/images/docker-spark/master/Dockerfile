@@ -14,6 +14,8 @@ COPY runTasks.py /
 
 ENV SPARK_MASTER_PORT 7077
 ENV SPARK_MASTER_WEBUI_PORT 8080
+# check what these logs are -- make sure don't grow too much. if do, need to send to regular logs
+# so can set max through stack and rotation
 ENV SPARK_MASTER_LOG /spark/logs
 
 EXPOSE 8080 7077 6066
