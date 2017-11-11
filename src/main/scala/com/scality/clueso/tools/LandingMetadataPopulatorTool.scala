@@ -41,7 +41,6 @@ object LandingMetadataPopulatorTool extends LazyLogging {
       fs.delete(new Path(landing_path), true)
     }
 
-
     val numRecordsPerPartition = List.fill(Math.max(totalNumFiles - 1, 0).toInt)(totalNumRecords / totalNumFiles) ++
       Array(totalNumRecords / totalNumFiles + totalNumRecords % totalNumFiles)
 

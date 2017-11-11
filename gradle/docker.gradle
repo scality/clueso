@@ -22,17 +22,10 @@ dockerCompose {
 }
 
 test.doFirst {
-
-
     // exposes "${serviceName}_HOST" and "${serviceName}_TCP_${exposedPort}" environment variables
     // for example exposes "WEB_HOST" and "WEB_TCP_80" environment variables for service named `web` with exposed port `80`
     // if service is scaled using scale option, environment variables will be exposed for each service instance like "WEB_1_HOST", "WEB_1_TCP_80", "WEB_2_HOST", "WEB_2_TCP_80" and so on
     dockerCompose.exposeAsEnvironment(test)
-    // exposes "${serviceName}.host" and "${serviceName}.tcp.${exposedPort}" system properties
-    // for example exposes "web.host" and "web.tcp.80" system properties for service named `web` with exposed port `80`
-    // if service is scaled using scale option, environment variables will be exposed for each service instance like "web_1.host", "web_1.tcp.80", "web_2.host", "web_2.tcp.80" and so on
-    dockerCompose.exposeAsSystemProperties(test)
-    // get information about container of service `web` (declared in docker-compose.yml)
 }
 
 
@@ -47,16 +40,13 @@ task buildGraphiteImage(type: DockerBuildImage) {
 
 task buildLivyImage(type: DockerBuildImage) {
     inputDir = file('docker/images/clueso-docker-livy')
-    tag = 'scality/clueso-livy:0.4.0-alluxio'
+    tag = 'scality/clueso-livy:0.4.0'
 }
-
-//buildLivyImage.isRequiredBy(dockerCompose)
 
 task builSparkBaseImage(type: DockerBuildImage) {
     inputDir = file('docker/images/docker-spark/base')
     tag = 'scality/spark-base:hadoop2.8-2.2'
 }
-
 
 dockerCompose.doFirst {
     builSparkBaseImage

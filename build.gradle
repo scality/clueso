@@ -4,7 +4,7 @@ plugins {
     id "com.github.maiflai.scalatest" version "0.16"
 }
 
-group 'com.scality.clueso'
+group group
 version version
 
 apply plugin: 'java'
@@ -24,10 +24,6 @@ configurations {
 sourceSets {
     main {
         compileClasspath += configurations.provided
-
-        resources {
-            filter.exclude("application.conf")
-        }
     }
 }
 
@@ -41,37 +37,36 @@ repositories {
 }
 
 dependencies {
-    shadow group: 'org.scala-lang', name: 'scala-library', version: '2.11.8'
-    shadow group: 'org.scala-lang', name: 'scala-reflect', version: '2.11.8'
-    shadow group: 'org.scala-lang', name: 'scala-compiler', version: '2.11.8'
+    shadow group: 'org.scala-lang', name: 'scala-library', version: scalaMinorVersion
+    shadow group: 'org.scala-lang', name: 'scala-reflect', version: scalaMinorVersion
+    shadow group: 'org.scala-lang', name: 'scala-compiler', version: scalaMinorVersion
 
     shadow 'org.apache.spark:spark-sql_'+scalaVersion+':' + sparkVersion
     shadow 'org.apache.spark:spark-streaming_'+scalaVersion+':' + sparkVersion
     shadow 'org.apache.spark:spark-core_'+scalaVersion+':' + sparkVersion
 
-    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.6.5'
-    compile group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: '2.6.5'
-    compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.6.5'
-
-
-    // required for the Metrics System
-    compile group: 'org.eclipse.jetty', name: 'jetty-server', version: '9.3.20.v20170531'
-
     compile 'org.apache.spark:spark-sql-kafka-0-10_'+scalaVersion+':' + sparkVersion
 
-    compile group: 'org.apache.hadoop', name: 'hadoop-aws', version: '2.8.0'
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jacksonVersion
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: jacksonVersion
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: jacksonVersion
+
+    compile group: 'org.apache.hadoop', name: 'hadoop-aws', version: hadoopVersion
 
     compile group: 'org.joda', name: 'joda-convert', version: '1.8.3'
+    compile group: 'commons-io', name: 'commons-io', version: '2.5'
 
     compile group: 'com.typesafe', name: 'config', version: '1.3.1'
-    compile group: 'org.quartz-scheduler', name: 'quartz', version: '2.3.0'
+    compile group: 'com.typesafe.scala-logging', name: 'scala-logging_2.11', version: scalaLoggingVersion
 
-    compile group: 'commons-io', name: 'commons-io', version: '2.5'
-    compile group: 'com.typesafe.scala-logging', name: 'scala-logging_2.11', version: '3.7.2'
+
     compile group: 'io.dropwizard.metrics', name: 'metrics-core', version: '3.2.4'
 
     // tools command line opt parsing
-    compile group: 'org.rogach', name: 'scallop_2.11', version: '3.1.0'
+    compile group: 'org.rogach', name: 'scallop_2.11', version: scallopVersion
+
+    // required for the Metrics System
+    compile group: 'org.eclipse.jetty', name: 'jetty-server', version: '9.3.20.v20170531'
 
     testCompile 'org.apache.spark:spark-sql_'+scalaVersion+':' + sparkVersion
     testCompile 'org.apache.spark:spark-streaming_'+scalaVersion+':' + sparkVersion
@@ -96,6 +91,8 @@ shadowJar {
         exclude(dependency {
             it.moduleGroup == 'org.apache.spark' && !it.moduleName.startsWith('spark-sql-kafka-')
         })
+
+        exclude('application.conf')
     }
 }
 
@@ -104,14 +101,15 @@ shadowJar {
 task toolShadowJar(type: com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
     mergeServiceFiles()
     classifier = 'tool'
+    zip64 true
 
     from sourceSets.main.output
     configurations = [project.configurations.runtime, project.configurations.shadow]
 
     exclude('META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA')
-    exclude('metrics.properties')
+    exclude('application.conf')
 
-    zip64 true
+
 }
 
 
@@ -125,6 +123,10 @@ idea {
 
 test {
     maxParallelForks = 1
+
+    // environment variables for running integration tests
+    environment "AWS_ACCESS_KEY_ID", "accessKey1"
+    environment "AWS_SECRET_ACCESS_KEY", "verySecretKey1"
 }
 
 task buildTool() {

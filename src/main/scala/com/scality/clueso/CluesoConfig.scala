@@ -6,8 +6,8 @@ class CluesoConfig(config: Config) {
   // storage params
   val s3SslEnabled = config.getString("s3_ssl_enabled")
   val s3Endpoint = config.getString("s3_endpoint")
-  val s3AccessKey = config.getString("s3_access_key")
-  val s3SecretKey = config.getString("s3_secret_key")
+  val s3AccessKey = sys.env("AWS_ACCESS_KEY_ID")
+  val s3SecretKey = sys.env("AWS_SECRET_ACCESS_KEY")
   val s3PathStyleAccess = config.getString("s3_path_style_access")
   val checkpointPath = config.getString("checkpoint_path")
 
