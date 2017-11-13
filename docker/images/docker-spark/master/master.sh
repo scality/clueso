@@ -1,14 +1,22 @@
 #!/bin/bash
 
+# s3 secret credentials for Zenko
+if [ -r /run/secrets/s3-credentials ] ; then
+    echo "Reading S3 credentials from secrets"
+    . /run/secrets/s3-credentials
+fi
+
 python runTasks.py || exit 1
 
 if curl --fail -X POST --output /dev/null --silent --head http://127.0.0.1:8080; then
-     printf 'Waiting for spark...'
+     printf 'Waiting for Spark Master...'
      until $(curl --output /dev/null --silent --head --fail http://127.0.0.1:8080); do
           printf '.'
           sleep 5
      done
 fi
+
+echo "Executing Clueso Pipeline in background..."
 
 java -cp /spark/conf:/spark/jars/* \
      -Xmx512m org.apache.spark.deploy.SparkSubmit \
