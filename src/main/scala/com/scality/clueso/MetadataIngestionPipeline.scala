@@ -22,6 +22,7 @@ class EventMessageRewriter {
 
     val valueTxtNode = rootNode.path("value").asInstanceOf[TextNode]
 
+    // parses "value" text contents as new json object
     val valueNode = mapper.readTree(valueTxtNode.asText()).asInstanceOf[ObjectNode]
 
     val metadataFieldNames = mutable.ListBuffer[String]()
@@ -69,7 +70,8 @@ object MetadataIngestionPipeline extends LazyLogging {
   val msgRewriteFun = (bytes: Array[Byte]) =>
     EventMessageRewriterWrapper.deser.rewriteMsg(bytes)
 
-  val maxOpIndexFun = (compactionRecordInterval:Long, value : String) => {
+  val findNextMaxOpIndexFun = (compactionRecordInterval:Long, value : String) => {
+    // op index format = "<12 0-padded record number>_<index number>"
     val recordNo = value.substring(0, 12).toLong
 
     if (recordNo % compactionRecordInterval == 0) {
@@ -81,7 +83,7 @@ object MetadataIngestionPipeline extends LazyLogging {
 
   import org.apache.spark.sql.functions.udf
   val msg_rewrite = udf(msgRewriteFun)
-  val max_op_index = udf(maxOpIndexFun)
+  val find_next_max_op_index = udf(findNextMaxOpIndexFun)
 
   /**
     * Applies projections and conditions to incoming data frame
@@ -121,7 +123,7 @@ object MetadataIngestionPipeline extends LazyLogging {
       )
       .withColumn("type", col("event.type"))
       .withColumn("opIndex", col("event.opIndex"))
-      .withColumn("maxOpIndex", max_op_index(lit(config.compactionRecordInterval), col("event.opIndex")))
+      .withColumn("maxOpIndex", find_next_max_op_index(lit(config.compactionRecordInterval), col("event.opIndex")))
       .withColumn("message", col("event.value"))
 
     df = df.filter(

@@ -38,12 +38,12 @@ class CluesoIngestionPipelineSpec extends WordSpec with Matchers with SparkConte
     "Scenario 3: calculate the current max Op Index" in {
       val compactionRecordInterval = 10
       for (i <- 1 to compactionRecordInterval) {
-        val result = MetadataIngestionPipeline.maxOpIndexFun(compactionRecordInterval, "%012d_0101".format(i))
+        val result = MetadataIngestionPipeline.findNextMaxOpIndexFun(compactionRecordInterval, "%012d_0101".format(i))
         result shouldEqual compactionRecordInterval
       }
 
       for (i <- compactionRecordInterval + 1 to compactionRecordInterval * 2) {
-        val result = MetadataIngestionPipeline.maxOpIndexFun(compactionRecordInterval*2, "%012d_0101".format(i))
+        val result = MetadataIngestionPipeline.findNextMaxOpIndexFun(compactionRecordInterval*2, "%012d_0101".format(i))
         result shouldEqual compactionRecordInterval*2
       }
     }
