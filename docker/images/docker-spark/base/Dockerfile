@@ -2,14 +2,10 @@ FROM java:openjdk-8-jdk
 MAINTAINER Vianney Rancurel <vr@scality.com>
 
 ENV HADOOP_VERSION 2.8.1
-ENV SPARK_BRANCH 2.1.1
+ENV SPARK_BRANCH 2.2.0
 ENV SPARK_HOME /spark/
 ENV JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-ENV SPARK_VERSION 2.1.1_2.11
-
-COPY conf /spark/conf/ 
-COPY clueso.jar /clueso/
-COPY application.conf /clueso/
+ENV SPARK_VERSION 2.2.0_2.11
 
 RUN apt-get update \
     && apt-get install -y supervisor curl build-essential \
@@ -41,5 +37,11 @@ RUN cd /apps/build/spark-$SPARK_VERSION \
 
 RUN tar -zxvf /apps/build/spark-$SPARK_VERSION/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION.tgz -C /tmp/ && mkdir -p $SPARK_HOME && cp -rf /tmp/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION/* $SPARK_HOME && \
     rm -rf -- /tmp/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION/
+
+
+COPY conf /spark/conf/ 
+RUN mkdir -p /clueso
+COPY clueso.jar /clueso/
+COPY application.conf /clueso/
 
 CMD bash
