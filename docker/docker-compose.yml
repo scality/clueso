@@ -4,13 +4,14 @@ services:
     image: jpbarto/boto3
     volumes:
       - ./images/docker-spark/master/runTasks.py:/runTasks.py
+    secrets:
+      - s3-credentials
     environment:
       AWS_ACCESS_KEY_ID: accessKey1
       AWS_SECRET_ACCESS_KEY: verySecretKey1
     entrypoint: /usr/local/bin/python /runTasks.py
     depends_on:
       - lb
-
 
   s3-data:
     build: ./images/S3/
@@ -50,6 +51,8 @@ services:
       REDIS_HOST: cache
       ENDPOINT: "localhost"
       RECORDLOG_ENABLED: "true"
+    secrets:
+      - s3-credentials
     command: npm run start_s3server
     depends_on:
       - s3-data
@@ -70,3 +73,8 @@ services:
 volumes:
   s3-data:
   s3-metadata:
+
+
+secrets:
+  s3-credentials:
+    file: ./secrets.txt
