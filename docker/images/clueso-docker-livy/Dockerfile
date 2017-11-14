@@ -1,4 +1,4 @@
-FROM scality/spark-base:hadoop2.8
+FROM scality/clueso-spark-base:hadoop2.8
 
 # packages
 RUN apt-get update && apt-get install -yq --no-install-recommends --force-yes \

@@ -24,15 +24,19 @@ RUN apt-get update \
 
 # once spark is packaged with hadoop 2.8 we can stop compiling
 # https://issues.apache.org/jira/browse/HADOOP-12963
-RUN mkdir -p /apps/build/ && \
-    cd /apps/build/ && \
-    git clone https://github.com/apache/spark.git && \
-    mv spark spark-$SPARK_VERSION && \
-    cd spark-$SPARK_VERSION && \
-    git checkout tags/v$SPARK_BRANCH  && \
-   ./dev/change-scala-version.sh 2.11
+RUN mkdir -p /apps/build/ \
+    && cd /apps/build/ \
+    && git clone https://github.com/apache/spark.git \
+    && mv spark spark-$SPARK_VERSION \
+    && cd spark-$SPARK_VERSION \
+    && git checkout tags/v$SPARK_BRANCH \
+    && ./dev/change-scala-version.sh 2.11
 
-RUN cd /apps/build/spark-$SPARK_VERSION && /apps/build/spark-$SPARK_VERSION/dev/make-distribution.sh --name spark-$SPARK_VERSION --tgz -Phadoop-2.7 -Dhadoop.version=$HADOOP_VERSION -DskipTests -DXms=2g
+RUN cd /apps/build/spark-$SPARK_VERSION \
+     && /apps/build/spark-$SPARK_VERSION/dev/make-distribution.sh \
+        --name spark-$SPARK_VERSION \
+        --tgz -Phadoop-2.7 -Dhadoop.version=$HADOOP_VERSION \
+        -DskipTests -DXms=2g
 
 
 RUN tar -zxvf /apps/build/spark-$SPARK_VERSION/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION.tgz -C /tmp/ && mkdir -p $SPARK_HOME && cp -rf /tmp/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION/* $SPARK_HOME && \
