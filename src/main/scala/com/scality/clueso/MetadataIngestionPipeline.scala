@@ -43,11 +43,7 @@ class EventMessageRewriter {
       }
     }
 
-    val userMd = if (rootNode.has("userMd")) {
-      valueNode.path("userMd").asInstanceOf[ObjectNode]
-    } else {
-      valueNode.putObject("userMd")
-    }
+    val userMd = valueNode.putObject("userMd")
 
     for (fieldName <- metadataFieldNames) {
       userMd.set(fieldName, valueNode.path(fieldName).deepCopy().asInstanceOf[JsonNode])

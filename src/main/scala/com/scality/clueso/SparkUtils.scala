@@ -87,7 +87,7 @@ object SparkUtils extends LazyLogging {
       }
     } catch {
       case e:IOException => {
-        println(e)
+        logger.error("Error while computing search", e)
         Array[String]()
       }
     }
@@ -109,8 +109,8 @@ object SparkUtils extends LazyLogging {
 
   def getParquetFilesStats(fs: FileSystem, path : String) = {
     val fsPath = new Path(path)
-    val statusList = if (!fs.exists(fsPath)) {
-      Array[FileStatus]()
+    val statusList : Array[FileStatus] = if (!fs.exists(fsPath)) {
+      Array()
     } else {
       fs.listStatus(new Path(path), parquetFilesFilter)
     }
@@ -119,11 +119,5 @@ object SparkUtils extends LazyLogging {
     val avgFileSize = statusList.map(_.getLen).sum / Math.max(fileCount, 1)
 
     (fileCount, avgFileSize)
-  }
-
-  private[clueso] def createSet[T]() = {
-    import scala.collection.JavaConverters._
-    java.util.Collections.newSetFromMap(
-      new java.util.concurrent.ConcurrentHashMap[T, java.lang.Boolean]).asScala
   }
 }
