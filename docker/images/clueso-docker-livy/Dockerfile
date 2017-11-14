@@ -28,7 +28,9 @@ ENV HADOOP_CONF_DIR /etc/hadoop/conf
 RUN mkdir -p /apps/build && \
     cd /apps/build && \
     git clone https://github.com/apache/incubator-livy.git $LIVY_BUILD_PATH && \
-    cd $LIVY_BUILD_PATH && git checkout $LIVY_BRANCH && mvn -DskipTests -Dspark.version=2.1.2 clean package && \
+    cd $LIVY_BUILD_PATH && \
+    git checkout $LIVY_BRANCH && \
+    mvn -DskipTests -Dspark.version=2.1.1  clean package && \
     unzip $LIVY_BUILD_PATH/assembly/target/*.zip -d /apps && \
     mv /apps/livy* $LIVY_APP_PATH && \
     mkdir -p $LIVY_APP_PATH/logs
