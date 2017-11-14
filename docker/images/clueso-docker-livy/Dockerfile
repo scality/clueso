@@ -9,8 +9,8 @@ RUN apt-get update && apt-get install -yq --no-install-recommends --force-yes \
     zip unzip \
     netcat inetutils-ping \
     libsasl2-modules && \
-    rm -rf /var/lib/apt/lists/* && \
     cd && wget https://bootstrap.pypa.io/ez_setup.py && python ez_setup.py && cd -
+#    rm -rf /var/lib/apt/lists/* && \
 
 # Overall ENV vars
 ENV LIVY_BRANCH tags/v0.4.0-incubating
@@ -27,15 +27,12 @@ ENV HADOOP_CONF_DIR /etc/hadoop/conf
 # Clone Livy repository
 RUN mkdir -p /apps/build && \
     cd /apps/build && \
-	git clone https://github.com/apache/incubator-livy.git $LIVY_BUILD_PATH
-
-RUN cd $LIVY_BUILD_PATH && git checkout $LIVY_BRANCH && mvn -DskipTests -Dspark.version=2.1.1 clean package && \
+    git clone https://github.com/apache/incubator-livy.git $LIVY_BUILD_PATH && \
+    cd $LIVY_BUILD_PATH && git checkout $LIVY_BRANCH && mvn -DskipTests -Dspark.version=2.1.2 clean package && \
     unzip $LIVY_BUILD_PATH/assembly/target/*.zip -d /apps && \
     mv /apps/livy* $LIVY_APP_PATH && \
-	mkdir -p $LIVY_APP_PATH/logs && \
-	mkdir -p /apps/spark-modules/
+    mkdir -p $LIVY_APP_PATH/logs
 
-RUN ln -s /spark /apps/spark
 COPY conf /apps/livy/conf
 COPY conf/log4j.properties /apps/spark/conf/log4j.properties
 
