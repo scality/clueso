@@ -103,14 +103,20 @@ Performance Testing
 ===================
 
 The perf_test tool creates files in a bucket with unique random metadata and queries Clueso in loop
-until the results for that file arrive. It requires `awscli` to be installed on OS.
+until the results for that file arrive.
 
 It assumes the docker stack is running (via docker-compose or docker swarm).
 
 This evaluates both query speed and latency, which may vary depending if cache is enabled and depending on 
-`cache_expiry` in configuration.
+`cache_expiry` in Clueso configuration.
 
-Results are published to Graphite and can be visualized using Grafana.
+Results can be published to Graphite and can be visualized using Grafana.
   
-`./perf_test.py`
+To run the performance tests against a local S3, run: 
+
+`S3_ENDPOINT_URL="http://127.0.0.1" ./bin/perf_test.py 1`
+
+By default metrics are published to a local Graphite, assuming it's listening on port *2003*. To override, run:
+
+`CARBON_SERVER="graphite-server-hostname" CARBON_PORT=2003 S3_ENDPOINT_URL="http://127.0.0.1" ./bin/perf_test.py 1`
 
