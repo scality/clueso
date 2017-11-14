@@ -70,7 +70,7 @@ def setup():
 def search(bucket_name, search_query):
   params = urllib.urlencode({'search': search_query})
   httpconn = httplib.HTTPConnection(S3_ENDPOINT_URL.replace('http://',''))
-  httpconn.request("GET", "/%s" % (BUCKET_NAME), params)
+  httpconn.request("GET", "/%s?%s" % (BUCKET_NAME, params))
   response = httpconn.getresponse().read()
   print(" RESPONSE = %s" % response)
   return response
