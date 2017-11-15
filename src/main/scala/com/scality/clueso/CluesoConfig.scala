@@ -5,6 +5,8 @@ import com.typesafe.config.Config
 import scala.util.Properties
 
 class CluesoConfig(config: Config) {
+  def sparkSqlPrintExplain = envOrElseConfig("spark_sql_print_explain").toBoolean
+
   // storage params
   def s3SslEnabled = envOrElseConfig("s3_ssl_enabled")
   def s3Endpoint = envOrElseConfig("s3_endpoint")

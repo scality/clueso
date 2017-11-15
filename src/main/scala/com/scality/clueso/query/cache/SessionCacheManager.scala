@@ -19,9 +19,9 @@ object SessionCacheManager extends LazyLogging {
   val setupDfLock = new scala.collection.parallel.mutable.ParHashSet[String]()
 
   def getCachedBucketDataframe(spark: SparkSession, bucketName: String)(implicit config: CluesoConfig): DataFrame = {
-    // check if cache doesn't exist
     val tableView = s"${new Date().getTime}_$bucketName"
 
+    // check if cache doesn't exist
     if (!bucketDfs.contains(bucketName)) {
       val bucketDf = setupDf(spark, config, bucketName)
 
@@ -59,7 +59,7 @@ object SessionCacheManager extends LazyLogging {
           } map { bucketDf =>
             logger.info(s"Calculating view $tableView")
             bucketDf.count() // force calculation
-            logger.info(s"Atomically swapping RDD for bucket = $bucketName ( new = $tableView )")
+            logger.info(s"Atomically swapping DF for bucket = $bucketName ( new = $tableView )")
             val oldDf = bucketDfs.getOrElse(bucketName, new AtomicReference()).getAndSet(bucketDf)
             bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
             releaseLock(bucketName) // unlock

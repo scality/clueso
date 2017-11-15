@@ -10,13 +10,22 @@ import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{col, dense_rank, lit}
 import org.apache.spark.sql.types.LongType
 
+import scala.util.matching.Regex
+
 class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfig) extends LazyLogging {
   val fs = SparkUtils.buildHadoopFs(config)
   val partDirnamePattern = "([A-Za-z0-9_]+)=(.*)".r
   val dateFormat = new java.text.SimpleDateFormat("yyyyMMdd_hhmmss")
 
+  /**
+    * Performs a compaction on all existing buckets
+    *
+    * @param numPartitions
+    * @param force if force = true, ignores the fact that some buckets may only have one subpartition maxOpIndex=N,
+    *              which doesn't meet the compaction criteria (there has to be 2 or more). Compaction is performed
+    *              regardless when force = true.
+    */
   def compact(numPartitions: Int, force: Boolean): Unit = {
-    // go through all partitions and see which ones are eligible for merging
     val landingPartitionsIt = fs.listStatus(new Path(PathUtils.landingURI)).iterator
 
     while (landingPartitionsIt.hasNext) {
@@ -25,12 +34,14 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
       if (fileStatus.isDirectory &&
         fileStatus.getPath.getName.matches(partDirnamePattern.pattern.pattern())) {
 
-        val regexMatch = partDirnamePattern.findFirstMatchIn(fileStatus.getPath.getName)
 
-        regexMatch.foreach { rm =>
+        val regexMatches : Option[Regex.Match] = partDirnamePattern.findFirstMatchIn(fileStatus.getPath.getName)
+
+        // only performs if there's a match
+        regexMatches.foreach { rm =>
           compactLandingPartition(
-            partitionColumnName = rm.group(1),
-            partitionValue = rm.group(2),
+            bucketColumn = rm.group(1), // "bucket"
+            bucketNameValue = rm.group(2), // bucket name
             numPartitions, force)
         }
       }
@@ -46,13 +57,22 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
     }
   }
 
+  /**
+    * Returns an array of Longs with all the  maxOpIndex subpartition values to compact
+    *
+    * @param landingPartitionPath path to scan
+    * @param force
+    * @return
+    */
   def getSubpartitionsToCompact(landingPartitionPath: String, force: Boolean): Array[Long] = {
+    // subpartitionPaths contains all dirs that follows the pattern <partitionColumn>=<partitionValue>
     val subpartitionPaths = fs.listStatus(new Path(landingPartitionPath), new PathFilter {
       override def accept(path: Path): Boolean = {
         fs.isDirectory(path) && path.getName.matches(partDirnamePattern.pattern.pattern())
       }
     })
 
+    // convert all subpartition values to Long
     var subpartitionValues = subpartitionPaths
       .map(_.getPath.getName)
       .flatMap(subpartDirName => {
@@ -64,8 +84,8 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
 
     // force = true – all values
     // force = false
-    //   subpartitions has 1 value -> List()
-    //   subpartitions has 2+ values -> truncate the biggest one (assumes integer)
+    //   subpartitions has 1 value -> Array()
+    //   subpartitions has 2+ values -> drop the one with the highest maxOpIndex (the most recent)
     if (!force) {
       subpartitionValues = if (subpartitionValues.length > 1) {
         subpartitionValues.sorted.dropRight(1)
@@ -78,12 +98,23 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
     subpartitionValues
   }
 
-  def removeSubpartitionsFromLanding(landingPartitionPath: String, subPartToCompact: Array[Long]): Unit = {
+  /**
+    * Delete's all the subpartitions with a value in <subPartToCompact> list
+    *
+    * @param landingPartitionPath path to a bucket partition
+    * @param subPartToRemove list of maxOpIndex to remove
+    */
+  def removeSubpartitionsFromLanding(landingPartitionPath: String, subPartToRemove: Array[Long]): Unit = {
     val subpartitionPaths = fs.listStatus(new Path(landingPartitionPath), new PathFilter {
       override def accept(path: Path): Boolean = {
+        // selects all the directories that follow the pattern K=V and with V present in   subPartToCompact   param
+
         if (fs.isDirectory(path) && path.getName.matches(partDirnamePattern.pattern.pattern())) {
-          val regexMatch = partDirnamePattern.findFirstMatchIn(path.getName)
-          regexMatch.foldLeft(false) { (v, rm) => v || subPartToCompact.contains(rm.group(2).toLong) }
+          val regexMatch : Option[Regex.Match] = partDirnamePattern.findFirstMatchIn(path.getName)
+
+          // returns true if there's a match and subpartition value (V) is present in subPartToCompact
+          // rm.group(2) is the value of maxOpIndex
+          regexMatch.foldLeft(false) { (v, rm) => v || subPartToRemove.contains(rm.group(2).toLong) }
         } else {
           false
         }
@@ -96,23 +127,24 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
   /**
     * Merges the contents of /landing/<partitionColumnName>=<partitionValue>/`*`/`*`.parquet and deletes
     * /landing/_spark_metadata. /landing/bucket=mybucketname/ will be composed of multiple subpartitions
-    * with format maxOpIndex=<N>. If only of such subpartitions is existent, the partition bucket=.. won't be
-    * merged into /staging. This can be forced by setting <force> to `true`
+    * with format maxOpIndex=<N>.
+    * If only one such subpartition exists, the partition bucket=.. won't be compacted into /staging.
+    * However, compaction behaviour can be forced by setting <force> to `true`.
     *
-    * @param partitionColumnName usually equal to 'bucket'
-    * @param partitionValue      usually equal to the name of the bucket
+    * @param bucketColumn         equal to 'bucket'
+    * @param bucketNameValue      usually equal to the name of the bucket
     * @param numPartitions       num of partitions should be equal or multiple of the number of executors on Query applications
     * @param force               if true, merges even if there's only one  subpartition maxOpIndex=N
     */
-  def compactLandingPartition(partitionColumnName: String, partitionValue: String, numPartitions: Int, force: Boolean) = {
-    println(s"Merging partition $partitionColumnName=$partitionValue into $numPartitions files")
+  def compactLandingPartition(bucketColumn: String, bucketNameValue: String, numPartitions: Int, force: Boolean) = {
+    logger.info(s"Merging partition $bucketColumn=$bucketNameValue into $numPartitions files")
 
     val lockFilePath = lockPath()
 
     if (acquireLock(lockFilePath)) {
       val startTs = new Date().getTime
 
-      val landingPartitionPath = s"${PathUtils.landingURI}/$partitionColumnName=$partitionValue"
+      val landingPartitionPath = s"${PathUtils.landingURI}/$bucketColumn=$bucketNameValue"
 
       try {
         val subPartToCompact = getSubpartitionsToCompact(landingPartitionPath, force)
@@ -124,11 +156,11 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
               .add("maxOpIndex", LongType)
             )
             .parquet(PathUtils.landingURI)
-            .where(col(partitionColumnName) === lit(partitionValue))
+            .where(col(bucketColumn) === lit(bucketNameValue))
             .where(col("maxOpIndex").isin(subPartToCompact: _*))
 
           // window function over union of partitions bucketName=<specified bucketName>
-          val windowSpec = Window.partitionBy("bucket","key").orderBy(col("kafkaTimestamp").desc)
+          val windowSpec = Window.partitionBy("key").orderBy(col("kafkaTimestamp").desc)
 
           data.coalesce(numPartitions)
             .withColumn("rank", dense_rank().over(windowSpec))
@@ -138,6 +170,8 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
             .partitionBy("bucket", "maxOpIndex")
             .mode(SaveMode.Append)
             .parquet(PathUtils.stagingURI)
+
+          logger.info(s"Successfully compacted bucket=$bucketNameValue")
         }
 
         logger.info(s"Waiting ${config.landingPurgeTolerance.toMillis}ms before purging compacted partitions")

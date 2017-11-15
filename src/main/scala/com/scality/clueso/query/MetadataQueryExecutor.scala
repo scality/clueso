@@ -1,6 +1,5 @@
 package com.scality.clueso.query
 
-import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{concurrent => juc}
 
@@ -9,23 +8,20 @@ import com.scality.clueso.query.cache.SessionCacheManager
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.spark.SparkContext
 import org.apache.spark.clueso.metrics.SearchMetricsSource
+//import org.apache.spark.clueso.metrics.SearchMetricsSource
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{col, _}
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
+import scala.concurrent.{ExecutionContext, Future}
 
 class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends LazyLogging {
 
   import MetadataQueryExecutor._
 
-  implicit val _config = config
-  implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
+  import ExecutionContext.Implicits.global
 
-  var lockedBucketName : Option[String] = None
-
-  SearchMetricsSource(spark, config)
+    SearchMetricsSource(spark, config)
 
   val metricsRegisterCancel = new AtomicBoolean(false)
 
@@ -51,32 +47,15 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
       setupDf(spark, config, bucketName)
     } else {
       // delegate to cache manager
-      SessionCacheManager.getCachedBucketDataframe(spark, bucketName)
+      SessionCacheManager.getCachedBucketDataframe(spark, bucketName)(config)
     }
   }
 
-  def printResults(f : Future[Array[String]], duration: Duration) = {
-    try {
-      val result = Await.result[Array[String]](f, duration)
-      println(s"RESULT:[${result.mkString(",")}]")
-    } catch {
-      case t:TimeoutException => {
-        println("")
-      }
-      case t:Throwable => {
-        logger.error("Error while printing results", t)
-        println(s"ERROR:${t.toString}")
-      }
-    }
-
-  }
-
-  def execAsync(query : MetadataQuery) = {
-    Future {
-      SparkUtils.getQueryResults(spark, this, query)
-    }
-  }
-
+  /**
+    * This returns the result to Livy via STDOUT. The println will output a valid JSON string
+    * with results that are then parsed by S3 before returning to client
+    *
+    */
   def executeAndPrint(query : MetadataQuery) = {
     val resultArray = SparkUtils.getQueryResults(spark, this, query)
     println("[" +  resultArray.mkString(",") + "]")
@@ -98,16 +77,18 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
       resultDf = resultDf.where(col("key") > lit(query.start_key.get))
     }
 
-    val currentWorkers = Math.max(currentActiveExecutors(spark.sparkContext).count(_ => true), 1)
+    val currentWorkers = Math.max(currentActiveExecutors(spark.sparkContext), 1)
 
     val result = resultDf
       .select(CluesoConstants.resultCols: _*)
       .orderBy(col("key"))
       .limit(query.limit)
 
-//    logger.info("Explain Query:")
-//    result.explain(true)
-//    logger.info("End Explain Query")
+    if (config.sparkSqlPrintExplain) {
+      logger.info("Explain Query:")
+      result.explain(true)
+      logger.info("End Explain Query")
+    }
 
     result
   }
@@ -115,15 +96,16 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
 object MetadataQueryExecutor extends LazyLogging {
 
-  /** Method that just returns the current active/registered executors
+  /** Method that just returns the count of current active/registered executors
     * excluding the driver.
     * @param sc The spark context to retrieve registered executors.
-    * @return a list of executors each in the form of host:port.
+    * @return count of executors
     */
-  def currentActiveExecutors(sc: SparkContext): Seq[String] = {
-    val allExecutors = sc.getExecutorMemoryStatus.map(_._1)
+  def currentActiveExecutors(sc: SparkContext): Int = {
+
+    val allExecutors = sc.getExecutorMemoryStatus.keys // keys contain workers hostnames (format = host:port)
     val driverHost: String = sc.getConf.get("spark.driver.host")
-    allExecutors.filter(! _.split(":")(0).equals(driverHost)).toList
+    allExecutors.filter(! _.split(":")(0).equals(driverHost)).count(_ => true)
   }
 
   // columns in Parquet files (landing and staging)
@@ -145,8 +127,6 @@ object MetadataQueryExecutor extends LazyLogging {
     // why not in Landing?
     spark.catalog.refreshTable("staging")
 
-    // read df
-    // need to name somehow so alluxio caches bucket separately?
     val stagingTable = spark.table("staging")
       .where(col("bucket").eqNullSafe(bucketName))
       .select(cols: _*)
@@ -162,7 +142,6 @@ object MetadataQueryExecutor extends LazyLogging {
       .parquet(PathUtils.landingURI(config))
       .createOrReplaceTempView("landing")
 
-    // need to name somehow so alluxio caches bucket separately?
     var landingTable = spark.table("landing")
       .where(col("bucket").eqNullSafe(bucketName))
       .select(cols: _*)
@@ -170,9 +149,9 @@ object MetadataQueryExecutor extends LazyLogging {
     landingTable
   }
 
-  // returns data frame together with wasCached boolean
+  // returns data frame
   def setupDf(spark : SparkSession, config : CluesoConfig, bucketName : String) : Dataset[Row]= {
-    val currentWorkers = Math.max(currentActiveExecutors(spark.sparkContext).count(_ => true), 1)
+    val currentWorkers = Math.max(currentActiveExecutors(spark.sparkContext), 1)
 
     logger.info(s"Calculating DFs for bucket $bucketName – current workers = $currentWorkers")
 
@@ -245,10 +224,8 @@ object MetadataQueryExecutor extends LazyLogging {
 
     val queryExecutor = MetadataQueryExecutor(spark, config)
 
-    var query : Option[MetadataQuery] = None
-
-    query = Some(MetadataQuery(bucketName, sqlWhereExpr, start_key = None, limit = 1000))
-    queryExecutor.executeAndPrint(query.get)
+    val query = MetadataQuery(bucketName, sqlWhereExpr, start_key = None)
+    queryExecutor.executeAndPrint(query)
 
   }
 }

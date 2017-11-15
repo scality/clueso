@@ -128,17 +128,36 @@ test {
     environment "AWS_SECRET_ACCESS_KEY", "verySecretKey1"
 }
 
+distDir = "${rootDir}/docker/images/docker-spark/base/clueso"
+
+clean.doFirst {
+    delete distDir
+}
+
 task buildTool() {
     dependsOn toolShadowJar
 
     doLast {
         copy {
             from toolShadowJar.outputs
-            into './dist/tool'
+            into "${distDir}/dist/lib/"
         }
         copy {
-            from './bin/'
-            into './dist/tool'
+            from "${rootDir}/bin/"
+            into "${distDir}/dist/bin/"
+        }
+    }
+}
+
+// compiles distribution
+task buildDist() {
+    dependsOn buildTool
+    dependsOn shadowJar
+
+    doLast {
+        copy {
+            from shadowJar.outputs
+            into "${distDir}/dist/lib/"
         }
     }
 }
