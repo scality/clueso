@@ -27,17 +27,17 @@ ENV HADOOP_CONF_DIR /etc/hadoop/conf
 # Clone Livy repository
 RUN mkdir -p /apps/build && \
     cd /apps/build && \
-	git clone https://github.com/apache/incubator-livy.git $LIVY_BUILD_PATH
-
-RUN cd $LIVY_BUILD_PATH && git checkout $LIVY_BRANCH && mvn -DskipTests -Dspark.version=2.1.1 clean package && \
+    git clone https://github.com/apache/incubator-livy.git $LIVY_BUILD_PATH && \
+    cd $LIVY_BUILD_PATH && \
+    git checkout $LIVY_BRANCH && \
+    mvn -DskipTests -Dspark.version=2.1.1  clean package && \
     unzip $LIVY_BUILD_PATH/assembly/target/*.zip -d /apps && \
     mv /apps/livy* $LIVY_APP_PATH && \
-	mkdir -p $LIVY_APP_PATH/logs && \
-	mkdir -p /apps/spark-modules/
+    mkdir -p $LIVY_APP_PATH/logs
 
-RUN ln -s /spark /apps/spark
 COPY conf /apps/livy/conf
 COPY conf/log4j.properties /apps/spark/conf/log4j.properties
+COPY conf/spark-defaults.conf /spark/conf/spark-defaults.conf
 
 # Copy custom files, set permissions
 COPY entrypoint.sh .

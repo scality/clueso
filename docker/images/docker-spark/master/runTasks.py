@@ -3,6 +3,7 @@ import time
 import json
 from botocore.exceptions import ClientError
 from botocore.exceptions import ConnectionError
+from botocore.exceptions import EndpointConnectionError
 
 session = boto3.session.Session()
 
@@ -31,6 +32,9 @@ while (True):
 	else:
 	    print "Unexpected error: %s" % e
 	    raise ValueError('Unable to create METADATA bucket')
+    except EndpointConnectionError as e:
+        print "Connection error: %s. Retrying in 3 seconds..." % e
+        time.sleep(3)
     except ConnectionError as e:
         print "Connection error: %s. Retrying in 3 seconds..." % e
         time.sleep(3)
