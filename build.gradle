@@ -244,10 +244,10 @@ task buildLivyImage(type: DockerBuildImage) {
 }
 
 task buildDocker() {
-    dependsOn buildGraphiteImage
-    dependsOn buildLivyImage
     dependsOn buildSparkMasterImage
     dependsOn buildSparkWorkerImage
+    dependsOn buildGraphiteImage
+    dependsOn buildLivyImage
 }
 
 dockerCompose.doFirst {
