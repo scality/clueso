@@ -4,6 +4,9 @@
 if [ -r /run/secrets/s3-credentials ] ; then
     echo "Reading S3 credentials from secrets"
     . /run/secrets/s3-credentials
+
+    echo "spark.hadoop.fs.s3a.access.key  $AWS_ACCESS_KEY_ID" >> /spark/conf/spark-defaults.conf
+    echo "spark.hadoop.fs.s3a.secret.key  $AWS_SECRET_ACCESS_KEY" >> /spark/conf/spark-defaults.conf
 fi
 
 if [ -z ${HOST+x} ]; then 

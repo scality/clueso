@@ -37,6 +37,7 @@ RUN mkdir -p /apps/build && \
 
 COPY conf /apps/livy/conf
 COPY conf/log4j.properties /apps/spark/conf/log4j.properties
+COPY conf/spark-defaults.conf /spark/conf/spark-defaults.conf
 
 # Copy custom files, set permissions
 COPY entrypoint.sh .
