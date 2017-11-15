@@ -2,48 +2,58 @@ package com.scality.clueso
 
 import com.typesafe.config.Config
 
+import scala.util.Properties
+
 class CluesoConfig(config: Config) {
   // storage params
-  val s3SslEnabled = config.getString("s3_ssl_enabled")
-  val s3Endpoint = config.getString("s3_endpoint")
-  val s3AccessKey = sys.env("AWS_ACCESS_KEY_ID")
-  val s3SecretKey = sys.env("AWS_SECRET_ACCESS_KEY")
-  val s3PathStyleAccess = config.getString("s3_path_style_access")
-  val checkpointPath = config.getString("checkpoint_path")
+  def s3SslEnabled = envOrElseConfig("s3_ssl_enabled")
+  def s3Endpoint = envOrElseConfig("s3_endpoint")
+  def s3AccessKey = envOrElseConfig("aws_access_key_id")
+  def s3SecretKey = envOrElseConfig("aws_secret_access_key")
+  def s3PathStyleAccess = config.getString("s3_path_style_access")
+  def checkpointPath = config.getString("checkpoint_path")
 
   // locations
-  val bucketName = config.getString("bucket_name")
-  val bucketLandingPath = config.getString("bucket_landing_path")
-  val bucketStagingPath = config.getString("bucket_staging_path")
+  def bucketName = config.getString("bucket_name")
+  def bucketLandingPath = config.getString("bucket_landing_path")
+  def bucketStagingPath = config.getString("bucket_staging_path")
 
-  val landingPathUri = s"s3a://$bucketName$bucketLandingPath"
-  val stagingPathUri = s"s3a://$bucketName$bucketStagingPath"
-  val checkpointUrl = s"s3a//$bucketName$checkpointPath"
+  def landingPathUri = s"s3a://$bucketName$bucketLandingPath"
+  def stagingPathUri = s"s3a://$bucketName$bucketStagingPath"
+  def checkpointUrl = s"s3a//$bucketName$checkpointPath"
 
   // compaction
   //    as S3 object store is eventual consistency, this sets a minimum 'age' for landing files
   //    to be deleted, avoiding data loss on compaction operation
-  val landingPurgeTolerance = config.getDuration("landing_purge_tolerance")
+  def landingPurgeTolerance = config.getDuration("landing_purge_tolerance")
 
 
   // pipeline settings
-  val triggerTime = config.getDuration("trigger_time")
-  val compactionRecordInterval = config.getLong("compaction_record_interval")
+  def triggerTime = config.getDuration("trigger_time")
+  def compactionRecordInterval = config.getLong("compaction_record_interval")
 
   // pipeline – Kafka settings
-  val kafkaBootstrapServers = config.getString("kafka_bootstrap_servers")
-  val kafkaTopic = config.getString("kafka_topic")
+  def kafkaBootstrapServers = config.getString("kafka_bootstrap_servers")
+  def kafkaTopic = config.getString("kafka_topic")
 
 
   // cache settings
-  val cacheDataframes = config.hasPath("cache_dataframes") && config.getBoolean("cache_dataframes")
-  val cacheExpiry = config.getDuration("cache_expiry")
+  def cacheDataframes = config.hasPath("cache_dataframes") && config.getBoolean("cache_dataframes")
+  def cacheExpiry = config.getDuration("cache_expiry")
   // controls after how much time should we evict the oldest cache, after finish a new computation
-  val cleanPastCacheDelay = config.getDuration("clean_past_cache_delay")
+  def cleanPastCacheDelay = config.getDuration("clean_past_cache_delay")
 
   // graphite metrics settings
-  val graphiteHost = config.getString("graphite.hostname")
-  val graphitePort = config.getInt("graphite.port")
+  def graphiteHost = envOrElseConfig("graphite.hostname")
+  def graphitePort = envOrElseConfig("graphite.port").toInt
+
+
+  def envOrElseConfig(name: String): String = {
+    Properties.envOrElse(
+      name.toUpperCase.replaceAll("""\.""", "_"),
+      config.getString(name)
+    )
+  }
 
 
   import scala.collection.JavaConversions._
