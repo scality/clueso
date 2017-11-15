@@ -2,11 +2,13 @@ FROM java:openjdk-8-jdk
 MAINTAINER Vianney Rancurel <vr@scality.com>
 
 ENV HADOOP_VERSION 2.8.1
-ENV SPARK_BRANCH 2.2.0
+ENV SPARK_BRANCH 2.1.1
 ENV SPARK_HOME /spark/
 ENV JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-ENV SPARK_VERSION 2.2.0_2.11
+ENV SPARK_VERSION 2.1.1_2.11
 
+# once spark is packaged with hadoop 2.8 we can stop compiling
+# https://issues.apache.org/jira/browse/HADOOP-12963
 RUN apt-get update \
     && apt-get install -y supervisor curl build-essential \
     python git maven --no-install-recommends \
@@ -16,31 +18,28 @@ RUN apt-get update \
     && apt-get install -y supervisor curl --no-install-recommends \
     && mkdir -p /var/log/supervisor \
     && tar -xvf /tmp/hadoop.tar.gz -C /opt/ \
-    && rm /tmp/hadoop.tar.gz
-
-# once spark is packaged with hadoop 2.8 we can stop compiling
-# https://issues.apache.org/jira/browse/HADOOP-12963
-RUN mkdir -p /apps/build/ \
+    && rm /tmp/hadoop.tar.gz \
+    && mkdir -p /apps/build/ \
     && cd /apps/build/ \
     && git clone https://github.com/apache/spark.git \
     && mv spark spark-$SPARK_VERSION \
     && cd spark-$SPARK_VERSION \
     && git checkout tags/v$SPARK_BRANCH \
-    && ./dev/change-scala-version.sh 2.11
-
-RUN cd /apps/build/spark-$SPARK_VERSION \
-     && /apps/build/spark-$SPARK_VERSION/dev/make-distribution.sh \
+    && ./dev/change-scala-version.sh 2.11 \
+    && cd /apps/build/spark-$SPARK_VERSION  \
+    && /apps/build/spark-$SPARK_VERSION/dev/make-distribution.sh \
         --name spark-$SPARK_VERSION \
         --tgz -Phadoop-2.7 -Dhadoop.version=$HADOOP_VERSION \
-        -DskipTests -DXms=2g
+        -DskipTests -DXms=2g \
+    && tar -zxvf /apps/build/spark-$SPARK_VERSION/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION.tgz -C /tmp/ \
+    && mkdir -p $SPARK_HOME \
+    && cp -rf /tmp/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION/* $SPARK_HOME \
+    && rm -rf -- /tmp/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION/ \
+    && mkdir -p /clueso
 
-
-RUN tar -zxvf /apps/build/spark-$SPARK_VERSION/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION.tgz -C /tmp/ && mkdir -p $SPARK_HOME && cp -rf /tmp/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION/* $SPARK_HOME && \
-    rm -rf -- /tmp/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION/
-
+RUN mkdir -p /clueso/heapdumps
 
 COPY conf /spark/conf/ 
-RUN mkdir -p /clueso
 COPY clueso.jar /clueso/
 COPY application.conf /clueso/
 

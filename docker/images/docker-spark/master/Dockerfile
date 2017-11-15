@@ -6,8 +6,11 @@ WORKDIR /
 
 # Install S3 client
 RUN apt-get update && \
-    apt-get install -y python-pip && \
+    apt-get install -y cron python-pip && \
     pip install boto3
+
+ADD crontab /etc/cron.d/compactor-cron
+RUN (crontab -l; cat /etc/cron.d/compactor-cron | crontab; crontab -l)
 
 COPY master.sh /
 COPY runTasks.py /
