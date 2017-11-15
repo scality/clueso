@@ -4,6 +4,7 @@ plugins {
     id "com.github.maiflai.scalatest" version "0.16"
     id 'com.bmuschko.docker-remote-api' version '3.1.0'
     id "com.avast.gradle.docker-compose" version "0.6.6"
+    id "org.ajoberstar.grgit" version "2.1.0"
 }
 
 group group
@@ -117,6 +118,8 @@ apply plugin: com.bmuschko.gradle.docker.DockerRemoteApiPlugin
 
 import com.bmuschko.gradle.docker.tasks.image.*
 
+import java.text.SimpleDateFormat
+
 
 def distDir = "${rootDir}/docker/images/docker-spark/base/clueso"
 
@@ -127,7 +130,7 @@ clean.doFirst {
 
 shadowJar {
     mergeServiceFiles()
-    classifier = 'all'
+    archiveName = "${baseName}"
     configurations = [project.configurations.compile]
     zip64 true
 
@@ -146,7 +149,7 @@ shadowJar {
 
 task toolShadowJar(type: com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
     mergeServiceFiles()
-    classifier = 'tool'
+    archiveName = "${baseName}-tool"
     zip64 true
 
     from sourceSets.main.output
@@ -154,6 +157,19 @@ task toolShadowJar(type: com.github.jengelman.gradle.plugins.shadow.tasks.Shadow
 
     exclude('META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA')
     exclude('application.conf')
+}
+
+import java.text.SimpleDateFormat
+import org.ajoberstar.grgit.Grgit
+task releaseFile() {
+    def file = new File("$distDir/RELEASE")
+    file.createNewFile()
+    file.text = """
+Version: $version
+Revision: ${Grgit.open(dir: '.').head().id}
+Buildtime: ${new SimpleDateFormat("dd-MM-yyyy HH:mm:ss").format(new Date())}
+Application-name: clueso
+"""
 }
 
 task buildTool() {
@@ -173,6 +189,7 @@ task buildTool() {
 
 // compiles distribution
 task buildDist() {
+    dependsOn releaseFile
     dependsOn buildTool
     dependsOn shadowJar
 
