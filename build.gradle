@@ -162,14 +162,16 @@ task toolShadowJar(type: com.github.jengelman.gradle.plugins.shadow.tasks.Shadow
 import java.text.SimpleDateFormat
 import org.ajoberstar.grgit.Grgit
 task releaseFile() {
-    def file = new File("$distDir/RELEASE")
-    file.createNewFile()
-    file.text = """
+    doLast {
+        def file = new File("$distDir/RELEASE")
+        file.createNewFile()
+        file.text = """
 Version: $version
 Revision: ${Grgit.open(dir: '.').head().id}
 Buildtime: ${new SimpleDateFormat("dd-MM-yyyy HH:mm:ss").format(new Date())}
 Application-name: clueso
 """
+    }
 }
 
 task buildTool() {
