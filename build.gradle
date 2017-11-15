@@ -2,6 +2,8 @@ plugins {
     id 'java'
     id 'com.github.johnrengelman.shadow' version '2.0.1'
     id "com.github.maiflai.scalatest" version "0.16"
+    id 'com.bmuschko.docker-remote-api' version '3.1.0'
+    id "com.avast.gradle.docker-compose" version "0.6.6"
 }
 
 group group
@@ -11,7 +13,8 @@ apply plugin: 'java'
 apply plugin: 'scala'
 apply plugin: 'idea'
 apply plugin: 'com.github.johnrengelman.shadow'
-apply from: 'gradle/docker.gradle'
+apply plugin: 'com.bmuschko.docker-remote-api'
+apply plugin: "com.avast.gradle.docker-compose"
 
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
@@ -77,6 +80,51 @@ dependencies {
 }
 
 
+idea {
+    module {
+        // IntelliJ does not know about the standard idiom of provided as used in managing
+        // uber/shaded jar dependencies. Make it so!
+        scopes.PROVIDED.plus += [ configurations.provided ]
+    }
+}
+
+test {
+    maxParallelForks = 1
+
+    // environment variables for running integration tests
+    environment "AWS_ACCESS_KEY_ID", "accessKey1"
+    environment "AWS_SECRET_ACCESS_KEY", "verySecretKey1"
+}
+
+
+
+
+dockerCompose.isRequiredBy(test)
+
+dockerCompose {
+    useComposeFiles = ['docker/docker-compose.yml']
+}
+
+test.doFirst {
+    // exposes "${serviceName}_HOST" and "${serviceName}_TCP_${exposedPort}" environment variables
+    // for example exposes "WEB_HOST" and "WEB_TCP_80" environment variables for service named `web` with exposed port `80`
+    // if service is scaled using scale option, environment variables will be exposed for each service instance like "WEB_1_HOST", "WEB_1_TCP_80", "WEB_2_HOST", "WEB_2_TCP_80" and so on
+    dockerCompose.exposeAsEnvironment(test)
+}
+
+
+apply plugin: com.bmuschko.gradle.docker.DockerRemoteApiPlugin
+
+import com.bmuschko.gradle.docker.tasks.image.*
+
+
+def distDir = "${rootDir}/docker/images/docker-spark/base/clueso"
+
+clean.doFirst {
+    delete distDir
+}
+
+
 shadowJar {
     mergeServiceFiles()
     classifier = 'all'
@@ -96,7 +144,6 @@ shadowJar {
     }
 }
 
-
 task toolShadowJar(type: com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
     mergeServiceFiles()
     classifier = 'tool'
@@ -107,31 +154,6 @@ task toolShadowJar(type: com.github.jengelman.gradle.plugins.shadow.tasks.Shadow
 
     exclude('META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA')
     exclude('application.conf')
-
-
-}
-
-
-idea {
-    module {
-        // IntelliJ does not know about the standard idiom of provided as used in managing
-        // uber/shaded jar dependencies. Make it so!
-        scopes.PROVIDED.plus += [ configurations.provided ]
-    }
-}
-
-test {
-    maxParallelForks = 1
-
-    // environment variables for running integration tests
-    environment "AWS_ACCESS_KEY_ID", "accessKey1"
-    environment "AWS_SECRET_ACCESS_KEY", "verySecretKey1"
-}
-
-distDir = "${rootDir}/docker/images/docker-spark/base/clueso"
-
-clean.doFirst {
-    delete distDir
 }
 
 task buildTool() {
@@ -140,11 +162,11 @@ task buildTool() {
     doLast {
         copy {
             from toolShadowJar.outputs
-            into "${distDir}/dist/lib/"
+            into "${distDir}/lib/"
         }
         copy {
             from "${rootDir}/bin/"
-            into "${distDir}/dist/bin/"
+            into "${distDir}/bin/"
         }
     }
 }
@@ -157,7 +179,63 @@ task buildDist() {
     doLast {
         copy {
             from shadowJar.outputs
-            into "${distDir}/dist/lib/"
+            into "${distDir}/lib/"
         }
     }
 }
+
+
+task buildGraphiteImage(type: DockerBuildImage) {
+    inputDir = file('docker/images/grafana_graphite')
+    tag = 'scality/grafana_graphite:latest'
+}
+
+task buildSparkBaseImage(type: DockerBuildImage) {
+    dependsOn buildDist
+
+    doFirst {
+        copy {
+            from distDir
+            into "${rootDir}/docker/images/docker-spark/base/clueso"
+        }
+    }
+
+    inputDir = file('docker/images/docker-spark/base')
+    tag = 'scality/clueso-spark-base:hadoop2.8'
+}
+
+task buildSparkMasterImage(type: DockerBuildImage) {
+    dependsOn buildSparkBaseImage
+
+    inputDir = file('docker/images/docker-spark/master')
+    tag = 'scality/clueso-spark-master:hadoop2.8'
+}
+
+task buildSparkWorkerImage(type: DockerBuildImage) {
+    dependsOn buildSparkBaseImage
+
+    inputDir = file('docker/images/docker-spark/worker')
+    tag = 'scality/clueso-spark-worker:hadoop2.8'
+}
+
+
+task buildLivyImage(type: DockerBuildImage) {
+    dependsOn buildSparkBaseImage
+
+    inputDir = file('docker/images/clueso-docker-livy')
+    tag = 'scality/clueso-livy:0.4.0'
+}
+
+task buildDocker() {
+    dependsOn buildGraphiteImage
+    dependsOn buildLivyImage
+    dependsOn buildSparkMasterImage
+    dependsOn buildSparkWorkerImage
+}
+
+dockerCompose.doFirst {
+    buildSparkBaseImage
+    buildGraphiteImage
+}
+
+
