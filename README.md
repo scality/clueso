@@ -64,6 +64,9 @@ To run compaction on a specific bucket:
 
 Landing Populator Tool
 -----------------------
+ 
+### /!\ Warning /!\
+**This tool wipes all the data in the selected bucket's landing folder, so use with caution.**
 
 This tool generates fake metadata and can be used prior to a performance test.
 
