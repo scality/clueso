@@ -51,7 +51,7 @@ object MetadataStorageInfoTool extends LazyLogging {
     val fs = SparkUtils.buildHadoopFs(config)
 
     val bucketName = args(1)
-    val loop = if (args.size == 3) args(2).toBoolean else false
+    val loop = if (args.length == 3) args(2).toBoolean else false
 
     val landing_path = s"s3a://${config.bucketName}/landing/bucket=$bucketName"
     val staging_path = s"s3a://${config.bucketName}/staging/bucket=$bucketName"

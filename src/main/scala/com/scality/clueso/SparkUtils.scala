@@ -107,16 +107,31 @@ object SparkUtils extends LazyLogging {
     })
   }
 
-  def getParquetFilesStats(fs: FileSystem, path : String) = {
-    val fsPath = new Path(path)
-    val statusList : Array[FileStatus] = if (!fs.exists(fsPath)) {
-      Array()
+  def countParquetFiles(fs: FileSystem, fsPath : Path, extractFun : FileStatus => Long) : Long = {
+    if (!fs.exists(fsPath)) {
+      0L
     } else {
-      fs.listStatus(new Path(path), parquetFilesFilter)
-    }
+      val items = fs.listStatus(fsPath)
 
-    val fileCount = statusList.count(_ => true)
-    val avgFileSize = statusList.map(_.getLen).sum / Math.max(fileCount, 1)
+      var result = 0L
+
+      for (item <- items) {
+        if (item.isDirectory) {
+          result += countParquetFiles(fs, item.getPath, extractFun)
+        } else {
+          if (parquetFilesFilter.accept(item.getPath)) {
+            result += extractFun(item)
+          }
+        }
+      }
+
+      result
+    }
+  }
+
+  def getParquetFilesStats(fs: FileSystem, path : String) = {
+    val fileCount = countParquetFiles(fs, new Path(path), _ => 1)
+    val avgFileSize = countParquetFiles(fs, new Path(path), stat => stat.getLen) / Math.max(fileCount, 1)
 
     (fileCount, avgFileSize)
   }
