@@ -3,12 +3,14 @@ package com.scality.clueso.tools
 import java.io.File
 import java.util.UUID
 
+import com.scality.clueso.MetadataIngestionPipeline.find_next_max_op_index
 import com.scality.clueso.{CluesoConfig, CluesoConstants, PathUtils, SparkUtils}
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema
+import org.apache.spark.sql.functions.{col, lit}
 
 import scala.util.Random
 
@@ -59,7 +61,7 @@ object LandingMetadataPopulatorTool extends LazyLogging {
 
         val message = new GenericRowWithSchema(Array(
           userMd, bucketName, "", key, key,
-          new GenericRowWithSchema(Array("private", Array[String](), Array[String](), Array[String](), Array[String]()), CluesoConstants.eventAclSchema),
+          new GenericRowWithSchema(Array("private", Array[String](), Array[String](), Array[String](), Array[String]()), CluesoConstants.eventAclSchema), // acls
           Array(), // locations
           Map[String, String](), // tags
           new GenericRowWithSchema(Array("", Array[String](), "", "", ""), CluesoConstants.replicationInfoSchema), // replicationInfo
@@ -88,8 +90,15 @@ object LandingMetadataPopulatorTool extends LazyLogging {
       }.iterator
     })
 
-    spark.createDataFrame(generatedData, CluesoConstants.storedEventSchema)
+    val generatedDataDf = spark.createDataFrame(generatedData, CluesoConstants.storedEventSchema)
+      .withColumn("maxOpIndex", find_next_max_op_index(lit(config.compactionRecordInterval), col("opIndex")))
+      .cache()
+
+    generatedDataDf
       .write
+      .partitionBy("maxOpIndex")
       .parquet(landingBucketPath)
+
+    logger.info("Written %d records across %d partitions", generatedDataDf.count, generatedDataDf.rdd.getNumPartitions)
   }
 }
