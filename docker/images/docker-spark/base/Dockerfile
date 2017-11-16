@@ -37,10 +37,9 @@ RUN apt-get update \
     && rm -rf -- /tmp/spark-$SPARK_BRANCH-bin-spark-$SPARK_VERSION/ \
     && mkdir -p /clueso
 
-RUN mkdir -p /clueso/heapdumps
-
+COPY clueso /clueso
+RUN mkdir -p /clueso/heapdumps && mkdir -p /clueso/conf/
+COPY application.conf /clueso/conf/
 COPY conf /spark/conf/ 
-COPY clueso.jar /clueso/
-COPY application.conf /clueso/
 
 CMD bash

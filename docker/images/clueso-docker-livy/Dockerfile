@@ -1,8 +1,13 @@
-FROM scality/clueso-spark-base:hadoop2.8
+FROM scality/clueso-spark-base:hadoop2.8 as base
+FROM ubuntu
 
 # packages
 RUN apt-get update && apt-get install -yq --no-install-recommends --force-yes \
-    wget  \
+    wget \
+    python \
+    git \
+    openjdk-8-jdk \
+    maven curl  \
     iproute2 \
     libsvn1 \
     libcurl3 \
@@ -35,8 +40,11 @@ RUN mkdir -p /apps/build && \
     mv /apps/livy* $LIVY_APP_PATH && \
     mkdir -p $LIVY_APP_PATH/logs
 
+COPY --from=base /clueso/ /clueso/
+COPY --from=base /spark/ /spark/
+
 COPY conf /apps/livy/conf
-COPY conf/log4j.properties /apps/spark/conf/log4j.properties
+COPY conf/log4j.properties /spark/conf/log4j.properties
 COPY conf/spark-defaults.conf /spark/conf/spark-defaults.conf
 
 # Copy custom files, set permissions

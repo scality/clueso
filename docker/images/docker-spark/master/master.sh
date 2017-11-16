@@ -32,7 +32,7 @@ java -cp /spark/conf:/spark/jars/* \
      --queue default \
      --class com.scality.clueso.MetadataIngestionPipeline \
      --name "Clueso Metadata Ingestion Pipeline" \
-     file:///clueso/clueso.jar /clueso/application.conf &
+     file:///clueso/lib/clueso.jar /clueso/conf/application.conf &
 
 export SPARK_MASTER_IP=`hostname`
 

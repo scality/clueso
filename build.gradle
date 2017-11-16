@@ -130,7 +130,7 @@ clean.doFirst {
 
 shadowJar {
     mergeServiceFiles()
-    archiveName = "${baseName}"
+    archiveName = "${baseName}.jar"
     configurations = [project.configurations.compile]
     zip64 true
 
@@ -149,7 +149,7 @@ shadowJar {
 
 task toolShadowJar(type: com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
     mergeServiceFiles()
-    archiveName = "${baseName}-tool"
+    archiveName = "${baseName}-tool.jar"
     zip64 true
 
     from sourceSets.main.output
