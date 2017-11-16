@@ -1,3 +1,6 @@
+# These files are copied there in order to build the Docker image, so never add them to Git
+docker/images/docker-spark/base/clueso/*
+
 # Logs
 logs
 *.log
