@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -yq --no-install-recommends --force-yes \
     libsvn1 \
     libcurl3 \
     zip unzip \
-    netcat inetutils-ping \
+    netcat less inetutils-ping \
     libsasl2-modules && \
     rm -rf /var/lib/apt/lists/* && \
     cd && wget https://bootstrap.pypa.io/ez_setup.py && python ez_setup.py && cd -
