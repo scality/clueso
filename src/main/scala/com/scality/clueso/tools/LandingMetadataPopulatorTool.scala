@@ -1,7 +1,8 @@
 package com.scality.clueso.tools
 
 import java.io.File
-import java.util.UUID
+import java.sql.Timestamp
+import java.util.{Date, UUID}
 
 import com.scality.clueso.MetadataIngestionPipeline.find_next_max_op_index
 import com.scality.clueso.{CluesoConfig, CluesoConstants, PathUtils, SparkUtils}
@@ -70,7 +71,7 @@ object LandingMetadataPopulatorTool extends LazyLogging {
           "", // owner-id", StringType)
           Random.nextInt(200), // content-length", IntegerType)
           "", // content-type
-          "2017-08-08T03:57:02.249Z", // last-modified"
+          new Timestamp(new Date().getTime), // last-modified"
           "4b02d12ad7f063d67aec9dc2116a57a2", // content-md5
           "", // x-amz-server-version-id
           "scalitycloud-east-1", //dataStoreName
