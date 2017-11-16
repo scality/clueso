@@ -40,7 +40,6 @@ object CluesoConstants {
     .add("owner-id", StringType)
     .add("content-length", IntegerType)
     .add("content-type", StringType)
-//    .add("last-modified", StringType)
     .add("last-modified", TimestampType)
     .add("content-md5", StringType)
     .add("x-amz-server-version-id", StringType)
