@@ -1,16 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import boto3
+import httplib
 import os
+import random
+import socket
+import string
 import sys
 import time
-import random
-import string
-import socket
-import boto3
-import time
-import json
-import httplib, urllib
+import urllib
 from botocore.exceptions import ClientError
 from botocore.exceptions import ConnectionError
 
@@ -60,7 +59,7 @@ def setup():
             break
 	else:
 	    print "Unexpected error: %s" % e
-	    raise ValueError('Unable to create METADATA bucket')
+	    raise ValueError("Unable to create %s bucket" % BUCKET_NAME)
     except ConnectionError as e:
         print "Connection error: %s. Retrying in 3 seconds..." % e
         time.sleep(3)
