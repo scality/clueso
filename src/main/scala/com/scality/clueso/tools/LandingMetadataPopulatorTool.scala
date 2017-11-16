@@ -60,7 +60,7 @@ object LandingMetadataPopulatorTool extends LazyLogging {
         val eventType = "put"
 
         val message = new GenericRowWithSchema(Array(
-          userMd, bucketName, "", key, key,
+          userMd, bucketName, key,
           new GenericRowWithSchema(Array("private", Array[String](), Array[String](), Array[String](), Array[String]()), CluesoConstants.eventAclSchema), // acls
           Array(), // locations
           Map[String, String](), // tags
@@ -70,9 +70,10 @@ object LandingMetadataPopulatorTool extends LazyLogging {
           "", // owner-id", StringType)
           Random.nextInt(200), // content-length", IntegerType)
           "", // content-type
-          "2017-08-08T03:57:02.249Z", // last-modified", StringType)
+          "2017-08-08T03:57:02.249Z", // last-modified"
           "4b02d12ad7f063d67aec9dc2116a57a2", // content-md5
           "", // x-amz-server-version-id
+          "scalitycloud-east-1", //dataStoreName
           "", // x-amz-storage-class
           "", // x-amz-server-side-encryption
           "", // x-amz-server-side-encryption-aws-kms-key-id
