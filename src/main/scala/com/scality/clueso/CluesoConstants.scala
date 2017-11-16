@@ -40,7 +40,8 @@ object CluesoConstants {
     .add("owner-id", StringType)
     .add("content-length", IntegerType)
     .add("content-type", StringType)
-    .add("last-modified", StringType)
+//    .add("last-modified", StringType)
+    .add("last-modified", TimestampType)
     .add("content-md5", StringType)
     .add("x-amz-server-version-id", StringType)
     .add("dataStoreName", StringType)
@@ -67,25 +68,13 @@ object CluesoConstants {
     .add("type", StringType, false)
     .add("message", new StructType(eventValueSchema.fields), false)
 
-// TODO try to remove the ALIAS
   val resultCols = Seq(col("key"),
-    col("`last-modified`"), //.as("`last-modified`"),
-    col("`content-md5`"), //.as("`content-md5`"),
-    col("`owner-id`"), //.as("`owner-id`"),
-    col("`owner-display-name`"), //.as("`owner-display-name`"),
-    col("`content-length`"), //.as("`content-length`"),
-    col("`x-amz-storage-class`"), //.as("`x-amz-storage-class`"),
+    col("`last-modified`"),
+    col("`content-md5`"),
+    col("`owner-id`"),
+    col("`owner-display-name`"),
+    col("`content-length`"),
+    col("`x-amz-storage-class`"),
     col("bucket")
   )
-
-  val resultSchema = new StructType()
-    .add("key", StringType)
-    .add("`last-modified`", StringType)
-    .add("`content-md5`", StringType)
-    .add("`owner-id`", StringType)
-    .add("`owner-display-name`", StringType)
-    .add("`content-length`", LongType)
-    .add("`x-amz-storage-class`", StringType)
-    .add("bucket", StringType)
-
 }
