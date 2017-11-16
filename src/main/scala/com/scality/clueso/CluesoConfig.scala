@@ -53,7 +53,11 @@ class CluesoConfig(config: Config) {
   def envOrElseConfig(name: String): String = {
     Properties.envOrElse(
       name.toUpperCase.replaceAll("""\.""", "_"),
-      config.getString(name)
+      if (config.hasPath(name)) {
+        config.getString(name)
+      } else {
+        ""
+      }
     )
   }
 
