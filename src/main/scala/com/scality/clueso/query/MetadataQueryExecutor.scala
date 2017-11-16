@@ -148,14 +148,20 @@ object MetadataQueryExecutor extends LazyLogging {
     landingTable
   }
 
-  // returns data frame
-  def setupDf(spark : SparkSession, config : CluesoConfig, bucketName : String) : Dataset[Row]= {
+  /**
+    * Calculates result DF, by reading cold landing and merging with specified staging
+    * @param spark
+    * @param config
+    * @param bucketName
+    * @param stagingTable
+    * @return
+    */
+  def setupDf(spark : SparkSession, config : CluesoConfig, bucketName : String, stagingTable : DataFrame) : Dataset[Row]= {
     val currentWorkers = Math.max(currentActiveExecutors(spark.sparkContext), 1)
-
     logger.info(s"Calculating DFs for bucket $bucketName – current workers = $currentWorkers")
 
     // read df
-    var stagingTable = getColdStagingTable(spark, config, bucketName)
+
     var landingTable = getColdLandingTable(spark, config, bucketName)
 
     val colsLanding = landingTable.columns.toSet
@@ -202,6 +208,18 @@ object MetadataQueryExecutor extends LazyLogging {
     }
 
     result
+  }
+
+  /**
+    * Calculates result DF, by reading cold landing and merging with cold staging
+    * @param spark
+    * @param config
+    * @param bucketName
+    * @return
+    */
+  def setupDf(spark : SparkSession, config : CluesoConfig, bucketName : String) : Dataset[Row]= {
+    var stagingTable = getColdStagingTable(spark, config, bucketName)
+    setupDf(spark, config, bucketName, stagingTable)
   }
 
   def apply(spark: SparkSession, config: CluesoConfig): MetadataQueryExecutor = {

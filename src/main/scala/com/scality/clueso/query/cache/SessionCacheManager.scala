@@ -44,7 +44,7 @@ object SessionCacheManager extends LazyLogging {
           // async update dataframe if there's none already doing it
           Future {
             logger.info(s"Calculating view $tableView")
-            val bucketDf = setupDf(spark, config, bucketName)
+            val bucketDf = setupDf(spark, config, bucketName, bucketDfs(bucketName).get())
 
             bucketDf.createOrReplaceTempView(tableView)
 
