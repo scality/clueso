@@ -15,7 +15,7 @@ object MetadataStorageInfoTool extends LazyLogging {
 
   def processMetrics(metricName: String, measurement: Long, sendToGraphite : Boolean) = {
     val payload = s"$metricName $measurement ${new Date().getTime / 1000}\n"
-    println(payload)
+    logger.info(payload)
     if (sendToGraphite) {
       publishMetrics(payload)
     }
@@ -53,8 +53,8 @@ object MetadataStorageInfoTool extends LazyLogging {
     val bucketName = args(1)
     val loop = if (args.size == 3) args(2).toBoolean else false
 
-    val landing_path = s"s3a://${config.bucketName}/alluxio/landing/bucket=$bucketName"
-    val staging_path = s"s3a://${config.bucketName}/alluxio/staging/bucket=$bucketName"
+    val landing_path = s"s3a://${config.bucketName}/landing/bucket=$bucketName"
+    val staging_path = s"s3a://${config.bucketName}/staging/bucket=$bucketName"
 
     do {
       val (landingFileCount, landingAvgFileSize) = SparkUtils.getParquetFilesStats(fs, landing_path)
