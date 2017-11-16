@@ -4,6 +4,11 @@
 if [ -r /run/secrets/s3-credentials ] ; then
     echo "Reading S3 credentials from secrets"
     . /run/secrets/s3-credentials
+
+
+    echo "aws_access_key_id = \"$AWS_ACCESS_KEY_ID\"" >> /clueso/conf/application.conf
+    echo "aws_secret_access_key = \"$AWS_SECRET_ACCESS_KEY\"" >> /clueso/conf/application.conf
+
 fi
 
 echo "Starting cron"
