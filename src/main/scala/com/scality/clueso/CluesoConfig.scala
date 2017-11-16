@@ -5,6 +5,14 @@ import com.typesafe.config.Config
 import scala.util.Properties
 
 class CluesoConfig(config: Config) {
+  val searchMetricsFlushFrequency: Long = {
+    if (config.hasPath("search_metrics_flush_frequency")) {
+      config.getDuration("search_metrics_flush_frequency").toMillis
+    } else {
+      5000
+    }
+  }
+
   def sparkSqlPrintExplain = envOrElseConfig("spark_sql_print_explain").toBoolean
 
   // storage params

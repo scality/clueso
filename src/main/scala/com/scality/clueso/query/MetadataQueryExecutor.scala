@@ -27,12 +27,11 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
   val metricsRegisterThread = Future {
     while (!metricsRegisterCancel.get()) {
-      // TODO change to config?
-      Thread.sleep(5000)
+      Thread.sleep(config.searchMetricsFlushFrequency)
 
-//      logger.info("Registering new metrics")
+      logger.debug("Registering new metrics")
       SearchMetricsSource.registerRddMetrics(spark)
-//      logger.info("Done")
+      logger.debug("Done")
     }
   }
 
