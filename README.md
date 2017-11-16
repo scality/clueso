@@ -6,7 +6,8 @@ Instructions
 
 To build, run:
 
-`./gradlew clean shadowJar -x test`
+`./gradlew clean buildDocker`
+
 
 To run integration tests – requires Docker:
 
@@ -21,7 +22,7 @@ To build Clueso Tool, invoke:
 
 `./gradlew buildTool`
 
-Tool scripts will be available under ./dist/tool
+The tool will be available under ./docker/images/docker-spark/base/clueso/bin
 
 
 Table Compactor Tool
