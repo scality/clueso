@@ -13,6 +13,7 @@ fi
 echo "Starting cron"
 cron start
 
+echo "Running python"
 python runTasks.py || exit 1
 
 if curl --fail -X POST --output /dev/null --silent --head http://127.0.0.1:8080; then
