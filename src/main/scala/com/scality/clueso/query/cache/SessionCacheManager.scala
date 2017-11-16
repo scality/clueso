@@ -19,7 +19,7 @@ object SessionCacheManager extends LazyLogging {
   val setupDfLock = new scala.collection.parallel.mutable.ParHashSet[String]()
 
   def getCachedBucketDataframe(spark: SparkSession, bucketName: String)(implicit config: CluesoConfig): DataFrame = {
-    val tableView = s"${new Date().getTime}_$bucketName"
+    val tableView = s"${new Date().getTime}_${bucketName.replaceAll("-","_").replaceAll(".","__")}"
 
     // check if cache doesn't exist
     if (!bucketDfs.contains(bucketName)) {
