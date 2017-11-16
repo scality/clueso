@@ -212,13 +212,6 @@ task buildGraphiteImage(type: DockerBuildImage) {
 task buildSparkBaseImage(type: DockerBuildImage) {
     dependsOn buildDist
 
-    doFirst {
-        copy {
-            from distDir
-            into "${rootDir}/docker/images/docker-spark/base/clueso"
-        }
-    }
-
     inputDir = file('docker/images/docker-spark/base')
     tag = 'scality/clueso-spark-base:hadoop2.8'
 }
