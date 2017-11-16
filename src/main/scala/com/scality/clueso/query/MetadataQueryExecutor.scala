@@ -110,7 +110,7 @@ object MetadataQueryExecutor extends LazyLogging {
 
   // columns in Parquet files (landing and staging)
   val cols = Array(col("bucket"),
-    col("kafkaTimestamp"),
+    col("opIndex"),
     col("key"),
     col("type"),
     col("message"))
@@ -164,7 +164,7 @@ object MetadataQueryExecutor extends LazyLogging {
     val unionCols = colsLanding ++ colsStaging
 
     // window function over union of partitions bucketName=<specified bucketName>
-    val windowSpec = Window.partitionBy("key").orderBy(col("kafkaTimestamp").desc)
+    val windowSpec = Window.partitionBy("key").orderBy(col("opIndex").desc)
 
     import SparkUtils.fillNonExistingColumns
 
@@ -173,7 +173,7 @@ object MetadataQueryExecutor extends LazyLogging {
       .withColumn("rank", row_number().over(windowSpec))
       .where(col("rank").lt(2).and(col("type") =!= "delete"))
       .select(col("bucket"),
-        col("kafkaTimestamp"),
+        col("opIndex"),
         col("key"),
         col("type"),
         col("message.`userMd`").as("userMd"),

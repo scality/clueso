@@ -1,8 +1,7 @@
 package com.scality.clueso.tools
 
 import java.io.File
-import java.sql.Timestamp
-import java.util.{Date, UUID}
+import java.util.UUID
 
 import com.scality.clueso.{CluesoConfig, CluesoConstants, PathUtils, SparkUtils}
 import com.typesafe.config.ConfigFactory
@@ -34,11 +33,11 @@ object LandingMetadataPopulatorTool extends LazyLogging {
 
     val fs = SparkUtils.buildHadoopFs(config)
 
-    val landing_path = s"${PathUtils.landingURI}/bucket=$bucketName"
+    val landingBucketPath = s"${PathUtils.landingURI}/bucket=$bucketName"
 
-    if (fs.exists(new Path(s"${landing_path}/"))) {
-      logger.info(s"Deleting landing path: ${landing_path}")
-      fs.delete(new Path(landing_path), true)
+    if (fs.exists(new Path(s"$landingBucketPath/"))) {
+      logger.info(s"Deleting landing path: $landingBucketPath")
+      fs.delete(new Path(landingBucketPath), true)
     }
 
     val numRecordsPerPartition = List.fill(Math.max(totalNumFiles - 1, 0).toInt)(totalNumRecords / totalNumFiles) ++
@@ -81,8 +80,8 @@ object LandingMetadataPopulatorTool extends LazyLogging {
           "" // x-amz-version-id
         ), CluesoConstants.eventValueSchema)
 
-        val kafkaTimestamp = new Timestamp(new Date().getTime)
-        val values : Array[Any] = Array(bucketName, key, kafkaTimestamp, eventType, message)
+        val opIndex = "%012d_%d".format(recordNo,Random.nextInt(200))
+        val values : Array[Any] = Array(bucketName, key, opIndex, eventType, message)
 
         new GenericRowWithSchema(values, CluesoConstants.storedEventSchema).asInstanceOf[Row]
 
@@ -91,6 +90,6 @@ object LandingMetadataPopulatorTool extends LazyLogging {
 
     spark.createDataFrame(generatedData, CluesoConstants.storedEventSchema)
       .write
-      .parquet(landing_path)
+      .parquet(landingBucketPath)
   }
 }

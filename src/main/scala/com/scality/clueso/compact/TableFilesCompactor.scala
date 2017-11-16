@@ -160,7 +160,7 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
             .where(col("maxOpIndex").isin(subPartToCompact: _*))
 
           // window function over union of partitions bucketName=<specified bucketName>
-          val windowSpec = Window.partitionBy("key").orderBy(col("kafkaTimestamp").desc)
+          val windowSpec = Window.partitionBy("key").orderBy(col("opIndex").desc)
 
           data.coalesce(numPartitions)
             .withColumn("rank", dense_rank().over(windowSpec))

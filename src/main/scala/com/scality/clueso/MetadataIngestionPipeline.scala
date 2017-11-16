@@ -7,7 +7,6 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.{OutputMode, ProcessingTime}
-import org.apache.spark.sql.types.TimestampType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import scala.collection.mutable
@@ -93,7 +92,6 @@ object MetadataIngestionPipeline extends LazyLogging {
   def filterAndParseEvents(bucketNameToFilterOut : String, eventStream: DataFrame)(implicit spark : SparkSession, config: CluesoConfig) = {
 
     var df = eventStream.select(
-      col("timestamp").cast(TimestampType).as("kafkaTimestamp"),
       msg_rewrite(col("value")).as("content")
     )
 
@@ -101,7 +99,6 @@ object MetadataIngestionPipeline extends LazyLogging {
     df = df.filter(col("content").isNotNull)
           .filter(length(col("content")).gt(3))
           .select(
-            col("kafkaTimestamp"),
             from_json(col("content"), CluesoConstants.eventSchema).alias("event")
           )
 
