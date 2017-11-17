@@ -142,3 +142,11 @@ By default metrics are published to a local Graphite, assuming it's listening on
 
 `CARBON_SERVER="graphite-server-hostname" CARBON_PORT=2003 S3_ENDPOINT_URL="http://127.0.0.1" ./bin/perf_test.py 1`
 
+
+
+Configuration
+=============
+
+In Livy, Spark settings can be set in `spark-defaults.conf` file, which is available in this repo on `./docker/images/clueso-docker-livy/conf/spark-defaults.conf`.
+
+ 
