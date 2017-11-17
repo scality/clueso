@@ -88,19 +88,37 @@ parquet files.
 
 
 
-Stats Tool
+Info Tool
 ----------
 
 This tool can report on the number of search metadata files in persistent layer (S3).
 This includes average file size of Parquet files, number of records in metadata for a specific bucket and 
 number of parquet files in total for that bucket.
 
-`./searchmd-info.sh application.conf <bucketName> [loop=true|false]`
+`./info.sh application.conf <bucketName> [loop=true|false]`
 
 By selecting `loop=true`, it will periodically poll and send information to graphite.
 
 Please set GRAPHITE_HOST and GRAPHITE_PORT 
 
+
+Output will be similar to:
+
+```
+17/11/17 21:33:21 INFO MetadataStorageInfoTool$: search_metadata.staging.try1.parquet_file_count 0 1510954401
+
+17/11/17 21:33:21 INFO MetadataStorageInfoTool$: search_metadata.landing.try1.avg_file_size 1872098 1510954401
+
+17/11/17 21:33:21 INFO MetadataStorageInfoTool$: search_metadata.staging.try1.avg_file_size 0 1510954401
+
+17/11/17 21:33:21 INFO MetadataStorageInfoTool$: search_metadata.landing.try1.total_file_size 134791056 1510954401
+
+17/11/17 21:33:21 INFO MetadataStorageInfoTool$: search_metadata.staging.try1.total_file_size 0 1510954401
+
+17/11/17 21:33:21 INFO MetadataStorageInfoTool$: search_metadata.landing.try1.record_count 7000000 1510954401
+
+17/11/17 21:33:21 INFO MetadataStorageInfoTool$: search_metadata.staging.try1.record_count 0 1510954401
+```
 
 
 Performance Testing
