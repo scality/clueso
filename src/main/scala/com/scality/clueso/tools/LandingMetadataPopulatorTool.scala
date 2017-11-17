@@ -48,6 +48,7 @@ object LandingMetadataPopulatorTool extends LazyLogging {
 
     val partitionsRdd = spark.sparkContext.parallelize(numRecordsPerPartition, totalNumFiles.toInt)
 
+    val compactionRecordInterval = config.compactionRecordInterval
     val generatedData = partitionsRdd.mapPartitions(it => {
       val prefix = UUID.randomUUID().toString.substring(0, 4)
 
@@ -88,7 +89,7 @@ object LandingMetadataPopulatorTool extends LazyLogging {
 
 
         val values : Array[Any] = Array(bucketName, key, opIndex,
-          MetadataIngestionPipeline.findNextMaxOpIndexFun(config.compactionRecordInterval, opIndex),
+          MetadataIngestionPipeline.findNextMaxOpIndexFun(compactionRecordInterval, opIndex).toString,
           eventType, message)
 
         new GenericRowWithSchema(values, CluesoConstants.storedEventSchema).asInstanceOf[Row]
