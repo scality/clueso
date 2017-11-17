@@ -5,7 +5,7 @@ import java.sql.Timestamp
 import java.util.{Date, UUID}
 
 import com.scality.clueso.MetadataIngestionPipeline.find_next_max_op_index
-import com.scality.clueso.{CluesoConfig, CluesoConstants, PathUtils, SparkUtils}
+import com.scality.clueso._
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.hadoop.fs.Path
@@ -85,7 +85,11 @@ object LandingMetadataPopulatorTool extends LazyLogging {
         ), CluesoConstants.eventValueSchema)
 
         val opIndex = "%012d_%d".format(recordNo,Random.nextInt(200))
-        val values : Array[Any] = Array(bucketName, key, opIndex, eventType, message)
+
+
+        val values : Array[Any] = Array(bucketName, key, opIndex,
+          MetadataIngestionPipeline.findNextMaxOpIndexFun(config.compactionRecordInterval, opIndex),
+          eventType, message)
 
         new GenericRowWithSchema(values, CluesoConstants.storedEventSchema).asInstanceOf[Row]
 
