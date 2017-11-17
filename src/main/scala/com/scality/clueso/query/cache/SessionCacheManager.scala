@@ -65,8 +65,10 @@ object SessionCacheManager extends LazyLogging {
             releaseLock(bucketName) // unlock
 
             // sleep before deleting oldDf
-            Thread.sleep(config.cleanPastCacheDelay.toMillis)
-            logger.info(s"Unpersisting ${oldDf.rdd.name} after 10sec")
+            val sleepDuration = config.cleanPastCacheDelay.toMillis
+            logger.info(s"Sleeping cleanPastCacheDelay = $sleepDuration ms")
+            Thread.sleep(sleepDuration)
+            logger.info(s"Unpersisting ${oldDf.rdd.name} after $sleepDuration ms")
             oldDf.unpersist(true)
           }
         }
