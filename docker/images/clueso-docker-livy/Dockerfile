@@ -51,7 +51,7 @@ COPY conf/spark-defaults.conf /spark/conf/spark-defaults.conf
 COPY entrypoint.sh .
 
 RUN chmod +x entrypoint.sh
-#RUN ls -la /apps/livy/jars/
+
 # Expose port
 EXPOSE 8998 38600-38632 4040-4056 5005
 
