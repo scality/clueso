@@ -33,7 +33,14 @@ if CARBON_SERVER != '':
     sock.connect((CARBON_SERVER, CARBON_PORT))
 
 
+def make_bucket_public(bucket_name):
+    bucketAcl = s3Resource.BucketAcl(bucket_name)
+    bucketAcl.put(ACL='public-read')
+    print("Set ACL = public-read for bucket %s" % bucket_name)
+
+
 def search(bucket_name, search_query):
+    make_bucket_public(bucket_name)
     params = urllib.urlencode({'search': search_query})
     httpconn = httplib.HTTPConnection(S3_ENDPOINT_URL.replace('http://',''))
     httpconn.request("GET", "/%s?%s" % (bucket_name, params))
