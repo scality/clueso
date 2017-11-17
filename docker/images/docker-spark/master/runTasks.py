@@ -1,6 +1,5 @@
 import boto3
 import time
-import json
 from botocore.exceptions import ClientError
 from botocore.exceptions import ConnectionError
 from botocore.exceptions import EndpointConnectionError
@@ -20,10 +19,11 @@ s3Resource = session.resource(
 bucketName = "METADATA"
 sparkPrefix = "landing/_spark_metadata/"
 
+print "Attempting to create bucket %s..." % bucketName
 while (True):
     try:
-	s3.create_bucket(Bucket=bucketName)
-	print "Created bucket: %s" % bucketName
+        s3.create_bucket(Bucket=bucketName)
+        print "Created bucket: %s" % bucketName
         break
     except ClientError as e:
 	if e.response['Error']['Code'] == 'BucketAlreadyOwnedByYou':
