@@ -122,8 +122,7 @@ object MetadataQueryExecutor extends LazyLogging {
       .parquet(PathUtils.stagingURI(config))
       .createOrReplaceTempView("staging")
 
-    // what does this do?
-    // why not in Landing?
+    // forces refresh of files in staging
     spark.catalog.refreshTable("staging")
 
     val stagingTable = spark.table("staging")
@@ -136,13 +135,13 @@ object MetadataQueryExecutor extends LazyLogging {
   def getColdLandingTable(spark : SparkSession, config : CluesoConfig, bucketName : String) = {
     logger.info(s"Reading cold landing table ${PathUtils.landingURI(config)}")
 
-    val _landingTable = spark.read
-      .schema(CluesoConstants.storedEventSchema)
-      .parquet(PathUtils.landingURI(config))
-      .createOrReplaceTempView("landing")
 
-    var landingTable = spark.table("landing")
-      .where(col("bucket").eqNullSafe(bucketName))
+    val landingTable = spark.read
+      .schema(CluesoConstants.storedEventSchema)
+      // read the bucket partition directly so _spark_metadata doesn't mess the plan
+      // when _spark_metadata is present in the directory we are trying to read (e.g. /landing ), it will be
+      // the source of truth for directory listing and, often, won't contain all the existing files in /landing/**
+      .parquet(s"${PathUtils.landingURI(config)}/bucket=$bucketName")
       .select(cols: _*)
 
     landingTable
