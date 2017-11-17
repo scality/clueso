@@ -64,6 +64,7 @@ object CluesoConstants {
     .add("bucket", StringType)
     .add("key", StringType, false)
     .add("opIndex", StringType, false)
+    .add("maxOpIndex", StringType, false)
     .add("type", StringType, false)
     .add("message", new StructType(eventValueSchema.fields), false)
 
