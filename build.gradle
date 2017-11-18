@@ -1,0 +1,252 @@
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '2.0.1'
+    id "com.github.maiflai.scalatest" version "0.16"
+    id 'com.bmuschko.docker-remote-api' version '3.1.0'
+    id "com.avast.gradle.docker-compose" version "0.6.6"
+    id "org.ajoberstar.grgit" version "2.1.0"
+}
+
+group group
+version version
+
+apply plugin: 'java'
+apply plugin: 'scala'
+apply plugin: 'idea'
+apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'com.bmuschko.docker-remote-api'
+apply plugin: "com.avast.gradle.docker-compose"
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+configurations {
+    provided
+    compile.extendsFrom provided
+}
+
+sourceSets {
+    main {
+        compileClasspath += configurations.provided
+    }
+}
+
+repositories {
+    jcenter()
+    mavenLocal()
+    mavenCentral()
+    maven {
+        url "https://oss.sonatype.org/content/repositories/snapshots"
+    }
+}
+
+dependencies {
+    shadow group: 'org.scala-lang', name: 'scala-library', version: scalaMinorVersion
+    shadow group: 'org.scala-lang', name: 'scala-reflect', version: scalaMinorVersion
+    shadow group: 'org.scala-lang', name: 'scala-compiler', version: scalaMinorVersion
+
+    shadow 'org.apache.spark:spark-sql_'+scalaVersion+':' + sparkVersion
+    shadow 'org.apache.spark:spark-streaming_'+scalaVersion+':' + sparkVersion
+    shadow 'org.apache.spark:spark-core_'+scalaVersion+':' + sparkVersion
+
+    compile 'org.apache.spark:spark-sql-kafka-0-10_'+scalaVersion+':' + sparkVersion
+
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jacksonVersion
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: jacksonVersion
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: jacksonVersion
+
+    compile group: 'org.apache.hadoop', name: 'hadoop-aws', version: hadoopVersion
+
+    compile group: 'org.joda', name: 'joda-convert', version: '1.8.3'
+    compile group: 'commons-io', name: 'commons-io', version: '2.5'
+
+    compile group: 'com.typesafe', name: 'config', version: '1.3.1'
+    compile group: 'com.typesafe.scala-logging', name: 'scala-logging_2.11', version: scalaLoggingVersion
+
+
+    compile group: 'io.dropwizard.metrics', name: 'metrics-core', version: '3.2.4'
+
+    // required for the Metrics System
+    compile group: 'org.eclipse.jetty', name: 'jetty-server', version: '9.3.20.v20170531'
+
+    testCompile 'org.apache.spark:spark-sql_'+scalaVersion+':' + sparkVersion
+    testCompile 'org.apache.spark:spark-streaming_'+scalaVersion+':' + sparkVersion
+    testCompile 'org.apache.spark:spark-core_'+scalaVersion+':' + sparkVersion
+
+    testCompile 'org.scalatest:scalatest_2.11:3.0.1'
+    testRuntime 'org.pegdown:pegdown:1.4.2'
+}
+
+
+idea {
+    module {
+        // IntelliJ does not know about the standard idiom of provided as used in managing
+        // uber/shaded jar dependencies. Make it so!
+        scopes.PROVIDED.plus += [ configurations.provided ]
+    }
+}
+
+test {
+    maxParallelForks = 1
+
+    // environment variables for running integration tests
+    environment "AWS_ACCESS_KEY_ID", "accessKey1"
+    environment "AWS_SECRET_ACCESS_KEY", "verySecretKey1"
+}
+
+
+
+
+dockerCompose.isRequiredBy(test)
+
+dockerCompose {
+    useComposeFiles = ['docker/docker-compose.yml']
+}
+
+test.doFirst {
+    // exposes "${serviceName}_HOST" and "${serviceName}_TCP_${exposedPort}" environment variables
+    // for example exposes "WEB_HOST" and "WEB_TCP_80" environment variables for service named `web` with exposed port `80`
+    // if service is scaled using scale option, environment variables will be exposed for each service instance like "WEB_1_HOST", "WEB_1_TCP_80", "WEB_2_HOST", "WEB_2_TCP_80" and so on
+    dockerCompose.exposeAsEnvironment(test)
+}
+
+
+apply plugin: com.bmuschko.gradle.docker.DockerRemoteApiPlugin
+
+import com.bmuschko.gradle.docker.tasks.image.*
+
+import java.text.SimpleDateFormat
+
+
+def distDir = "${rootDir}/docker/images/docker-spark/base/clueso"
+
+clean.doFirst {
+    delete distDir
+}
+
+
+shadowJar {
+    mergeServiceFiles()
+    archiveName = "${baseName}.jar"
+    configurations = [project.configurations.compile]
+    zip64 true
+
+    dependencies {
+        // excluding scala and spark (except for spark kafka) because Livy already includes the rest in the classpath
+        // and having them in the fatJar causes conflicts
+        exclude(dependency {
+            it.moduleGroup == 'org.scala-lang'
+        })
+
+        exclude(dependency {
+            it.moduleGroup == 'org.apache.spark' && !it.moduleName.startsWith('spark-sql-kafka-')
+        })
+
+        exclude('application.conf')
+    }
+}
+
+task toolShadowJar(type: com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
+    mergeServiceFiles()
+    archiveName = "${baseName}-tool.jar"
+    zip64 true
+
+    from sourceSets.main.output
+    configurations = [project.configurations.runtime, project.configurations.shadow]
+
+    exclude('META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA')
+    exclude('application.conf')
+}
+
+import java.text.SimpleDateFormat
+import org.ajoberstar.grgit.Grgit
+task releaseFile() {
+    doLast {
+        def file = new File("$distDir/RELEASE")
+        file.createNewFile()
+        file.text = """
+Version: $version
+Revision: ${Grgit.open(dir: '.').head().id}
+Buildtime: ${new SimpleDateFormat("dd-MM-yyyy HH:mm:ss").format(new Date())}
+Application-name: clueso
+"""
+    }
+}
+
+task buildTool() {
+    dependsOn toolShadowJar
+
+    doLast {
+        copy {
+            from toolShadowJar.outputs
+            into "${distDir}/lib/"
+        }
+        copy {
+            from "${rootDir}/bin/"
+            into "${distDir}/bin/"
+        }
+    }
+}
+
+// compiles distribution
+task buildDist() {
+    dependsOn releaseFile
+    dependsOn buildTool
+    dependsOn shadowJar
+
+    doLast {
+        copy {
+            from shadowJar.outputs
+            into "${distDir}/lib/"
+        }
+    }
+}
+
+
+task buildGraphiteImage(type: DockerBuildImage) {
+    inputDir = file('docker/images/grafana_graphite')
+    tag = 'scality/grafana_graphite:latest'
+}
+
+task buildSparkBaseImage(type: DockerBuildImage) {
+    dependsOn buildDist
+
+    inputDir = file('docker/images/docker-spark/base')
+    tag = 'scality/clueso-spark-base:hadoop2.8'
+}
+
+task buildSparkMasterImage(type: DockerBuildImage) {
+    dependsOn buildSparkBaseImage
+
+    inputDir = file('docker/images/docker-spark/master')
+    tag = 'scality/clueso-spark-master:hadoop2.8'
+}
+
+task buildSparkWorkerImage(type: DockerBuildImage) {
+    dependsOn buildSparkBaseImage
+
+    inputDir = file('docker/images/docker-spark/worker')
+    tag = 'scality/clueso-spark-worker:hadoop2.8'
+}
+
+
+task buildLivyImage(type: DockerBuildImage) {
+    dependsOn buildSparkBaseImage
+
+    inputDir = file('docker/images/clueso-docker-livy')
+    tag = 'scality/clueso-livy:0.4.0'
+}
+
+task buildDocker() {
+    dependsOn buildSparkMasterImage
+    dependsOn buildSparkWorkerImage
+    dependsOn buildGraphiteImage
+    dependsOn buildLivyImage
+}
+
+dockerCompose.doFirst {
+    buildSparkBaseImage
+    buildGraphiteImage
+}
+
+

@@ -1,0 +1,80 @@
+version: '3.1'
+services:
+  create-metadata-bucket:
+    image: jpbarto/boto3
+    volumes:
+      - ./images/docker-spark/master/runTasks.py:/runTasks.py
+    secrets:
+      - s3-credentials
+    environment:
+      AWS_ACCESS_KEY_ID: accessKey1
+      AWS_SECRET_ACCESS_KEY: verySecretKey1
+    entrypoint: /usr/local/bin/python /runTasks.py
+    depends_on:
+      - lb
+
+  s3-data:
+    build: ./images/S3/
+    ports:
+      - "9991:9991"
+    environment:
+      S3DATAPATH: /data
+      LISTEN_ADDR: 0.0.0.0
+    volumes:
+      - "s3-data:/data:rw"
+    command: npm run start_dataserver
+
+  s3-metadata:
+    build: ./images/S3/
+    ports:
+      - "9990:9990"
+    environment:
+      S3METADATAPATH: /metadata
+      LISTEN_ADDR: 0.0.0.0
+      RECORDLOG_ENABLED: "true"
+    volumes:
+      - 's3-metadata:/metadata:rw'
+    command: npm run start_mdserver
+
+  cache:
+    image: redis:alpine
+    ports:
+      - "6379"
+
+  s3-front:
+    build: ./images/S3/
+    ports:
+      - "8000"
+    environment:
+      DATA_HOST: s3-data
+      METADATA_HOST: s3-metadata
+      REDIS_HOST: cache
+      ENDPOINT: "localhost"
+      RECORDLOG_ENABLED: "true"
+    secrets:
+      - s3-credentials
+    command: npm run start_s3server
+    depends_on:
+      - s3-data
+      - s3-metadata
+      - cache
+
+  lb:
+    image: zenko/loadbalancer
+    ports:
+      - "80:80"
+    environment:
+      LISTEN_PORT: 80
+      UPSTREAM_SERVER: "s3-front:8000"
+    depends_on:
+      - s3-front
+
+
+volumes:
+  s3-data:
+  s3-metadata:
+
+
+secrets:
+  s3-credentials:
+    file: ./secrets.txt
