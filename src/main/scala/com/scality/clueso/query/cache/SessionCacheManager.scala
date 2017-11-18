@@ -10,7 +10,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.joda.time.DateTime
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 
 object SessionCacheManager extends LazyLogging {
   var bucketDfs = Map[String, AtomicReference[DataFrame]]()
@@ -49,11 +49,7 @@ object SessionCacheManager extends LazyLogging {
             bucketDf.createOrReplaceTempView(tableView)
 
             // this operation triggers execution
-            val cachingAsync = Future {
-              bucketDf.sparkSession.catalog.cacheTable(tableView)
-            }
-            import scala.concurrent.duration._
-            Await.ready(cachingAsync, 3 minutes)
+            bucketDf.sparkSession.catalog.cacheTable(tableView)
 
             bucketDf
           } map { bucketDf =>

@@ -12,6 +12,12 @@ import org.apache.spark.storage.RDDInfo
 
 import scala.collection.mutable
 
+//  attempt to have our own metrics registry, as Spark's is already initialized and doesn't allow us to 'register'
+//  new measurements on the fly (i can be wrong here!)
+//  this is an attempt to overcome this by running periodically a registerRddMetrics that adds new measurements,
+//  grouped by bucket
+
+// TODO this has to be tested
 object SearchMetricsSource extends LazyLogging {
   def countSearches(i: Int) = {
     searchMetricsSource.map(_.METRIC_SESSION_SEARCHES.inc(i))
