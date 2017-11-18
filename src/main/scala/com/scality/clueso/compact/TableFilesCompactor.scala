@@ -161,7 +161,7 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
           // window function over union of partitions bucketName=<specified bucketName>
           val windowSpec = Window.partitionBy("key").orderBy(col("opIndex").desc)
 
-          data//.coalesce(numPartitions)
+          data.coalesce(numPartitions)
             .withColumn("rank", dense_rank().over(windowSpec))
             .where((col("rank") === 1).and(col("type") =!= "delete"))
             .drop("rank")
