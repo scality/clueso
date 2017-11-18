@@ -1,7 +1,6 @@
 package com.scality.clueso.query
 
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.{concurrent => juc}
 
 import com.scality.clueso._
 import com.scality.clueso.query.cache.SessionCacheManager

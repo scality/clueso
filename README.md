@@ -28,13 +28,15 @@ The tool will be available under ./docker/images/docker-spark/base/clueso/bin
 Table Compactor Tool
 --------------------
 
-Format: `./table-compactor.sh <path/to/application.conf> <num parquet files per partition> [<bucket name>]`
+Format: `./table-compactor.sh <path/to/application.conf> <master-spark-URL> <num parquet files per partition> [<bucket name>] [<forceCompaction>]`
 
 **Parameters**
 
-1. path to `application.conf`, that specifies S3 connection settings and compaction settings  
-2. number of partitions – set this value to the same as number of spark executors
-3. *Optional* bucket name – name of bucket to compact, if none set, will compact all
+1. path to `application.conf`, that specifies S3 connection settings and compaction settings
+2. Spark Master URL, e.g. `spark://spark-master:7077`  
+3. number of partitions – set this value to the same as number of spark executors
+4. *Optional* bucket name – name of bucket to compact, if none set, will compact all
+5. *Optional* force – if true, compacts the bucket regardless of number of subpartitions 
 
 **Run Example**
 
