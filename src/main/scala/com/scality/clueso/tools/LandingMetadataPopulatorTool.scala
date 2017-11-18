@@ -58,7 +58,6 @@ object LandingMetadataPopulatorTool extends LazyLogging {
         val food = if (Random.nextBoolean()) { "pizza" } else { "pasta" }
         val userMd = Map("x-amz-meta-food" -> food, "x-amz-meta-random" -> Random.nextInt(10).toString)
 
-        //        val eventType = if (Random.nextBoolean()) { "delete" } else { "put" }
         val eventType = "put"
 
         val message = new GenericRowWithSchema(Array(

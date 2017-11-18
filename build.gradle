@@ -66,9 +66,6 @@ dependencies {
 
     compile group: 'io.dropwizard.metrics', name: 'metrics-core', version: '3.2.4'
 
-    // tools command line opt parsing
-    compile group: 'org.rogach', name: 'scallop_2.11', version: scallopVersion
-
     // required for the Metrics System
     compile group: 'org.eclipse.jetty', name: 'jetty-server', version: '9.3.20.v20170531'
 
@@ -135,6 +132,8 @@ shadowJar {
     zip64 true
 
     dependencies {
+        // excluding scala and spark (except for spark kafka) because Livy already includes the rest in the classpath
+        // and having them in the fatJar causes conflicts
         exclude(dependency {
             it.moduleGroup == 'org.scala-lang'
         })
