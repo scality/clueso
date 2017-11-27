@@ -25,21 +25,22 @@ if curl --fail -X POST --output /dev/null --silent --head http://127.0.0.1:8080;
 fi
 
 echo "Executing Clueso Pipeline in background..."
+
+supervisord -c /etc/supervisor/supervisord.conf -n
+
 # TODO put something to restart java pipeline in case this fails (non 0 return code)
-java -cp /spark/conf:/spark/jars/* \
-     -Xmx512m org.apache.spark.deploy.SparkSubmit \
-     --conf spark.executor.memory=512m \
-     --conf spark.driver.memory=512m \
-     --conf spark.master=spark://spark-master:7077 \
-     --conf spark.driver.cores=1 \
-     --conf spark.cores.max=2 \
-     --conf spark.executor.cores=1 \
-     --queue default \
-     --class com.scality.clueso.MetadataIngestionPipeline \
-     --name "Clueso Metadata Ingestion Pipeline" \
-     file:///clueso/lib/clueso.jar /clueso/conf/application.conf &
-
-
+#java -cp /spark/conf:/spark/jars/* \
+#     -Xmx512m org.apache.spark.deploy.SparkSubmit \
+#     --conf spark.executor.memory=512m \
+#     --conf spark.driver.memory=512m \
+#     --conf spark.master=spark://spark-master:7077 \
+#     --conf spark.driver.cores=1 \
+#     --conf spark.cores.max=2 \
+#     --conf spark.executor.cores=1 \
+#     --queue default \
+#     --class com.scality.clueso.MetadataIngestionPipeline \
+#     --name "Clueso Metadata Ingestion Pipeline" \
+#     file:///clueso/lib/clueso.jar /clueso/conf/application.conf &
 
 export SPARK_MASTER_IP=`hostname`
 

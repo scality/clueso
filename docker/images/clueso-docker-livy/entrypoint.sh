@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e -o pipefail
 
 # s3 secret credentials for Zenko
 if [ -r /run/secrets/s3-credentials ] ; then
@@ -16,4 +17,16 @@ else
   export LIBPROCESS_IP=$HOST
 fi
 
+# wait for Spark master before starting livy
+echo "Waiting for Spark Master to launch on 7077..."
+
+while ! nc -z spark-master 7077 &> /dev/null; do   
+  sleep 1 # wait for 1 second before check again
+done
+
+echo "Spark Master Ready"
+sleep 3
+echo "Starting Livy Server"
+
+# start Livy
 $LIVY_APP_PATH/bin/livy-server $@
