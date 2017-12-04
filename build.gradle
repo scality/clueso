@@ -212,21 +212,21 @@ task buildSparkBaseImage(type: DockerBuildImage) {
     dependsOn buildDist
 
     inputDir = file('docker/images/docker-spark/base')
-    tag = 'scality/clueso-spark-base:hadoop2.8'
+    tag = 'scality/clueso-spark-base:latest'
 }
 
 task buildSparkMasterImage(type: DockerBuildImage) {
     dependsOn buildSparkBaseImage
 
     inputDir = file('docker/images/docker-spark/master')
-    tag = 'scality/clueso-spark-master:hadoop2.8'
+    tag = 'scality/clueso-spark-master:latest'
 }
 
 task buildSparkWorkerImage(type: DockerBuildImage) {
     dependsOn buildSparkBaseImage
 
     inputDir = file('docker/images/docker-spark/worker')
-    tag = 'scality/clueso-spark-worker:hadoop2.8'
+    tag = 'scality/clueso-spark-worker:latest'
 }
 
 

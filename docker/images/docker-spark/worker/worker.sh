@@ -1,4 +1,5 @@
 #!/bin/bash
+set -eo pipefail
 
   . "/spark/sbin/spark-config.sh"
 
@@ -6,18 +7,13 @@
 
   mkdir -p $SPARK_WORKER_LOG
 
-# wait for Spark Master to be live
-echo "Waiting for Spark Master to launch on 7077..."
-
-while ! nc -z spark-master 7077 &>/dev/null; do   
+# exit if spark master is not ready
+if [ ! nc -z spark-master 7077 &>/dev/null ]; then   
   echo "Cannot contact spark master on 7077"
   exit 1
-done
+fi
 
-echo "Spark Master Ready"
-sleep 3
 echo "Starting Spark Worker"
-
 # start Spark Worker
   /spark/sbin/../bin/spark-class org.apache.spark.deploy.worker.Worker \
     --webui-port $SPARK_WORKER_WEBUI_PORT $SPARK_MASTER >> $SPARK_WORKER_LOG/spark-worker.out

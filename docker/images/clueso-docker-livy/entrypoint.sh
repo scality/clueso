@@ -17,16 +17,12 @@ else
   export LIBPROCESS_IP=$HOST
 fi
 
-# wait for Spark master before starting livy
-echo "Waiting for Spark Master to launch on 7077..."
+# exit if spark-master is not ready
+if [ ! nc -z spark-master 7077 &> /dev/null ]; then
+  echo "Cannot contact spark-master on 7077"
+  exit 1
+fi
 
-while ! nc -z spark-master 7077 &> /dev/null; do   
-  sleep 1 # wait for 1 second before check again
-done
-
-echo "Spark Master Ready"
-sleep 3
 echo "Starting Livy Server"
-
 # start Livy
 $LIVY_APP_PATH/bin/livy-server $@

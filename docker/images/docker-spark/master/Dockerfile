@@ -1,4 +1,4 @@
-FROM scality/clueso-spark-base:hadoop2.8
+FROM scality/clueso-spark-base:latest
 
 HEALTHCHECK CMD curl -f http://localhost:8080/ || exit 1
 
@@ -6,14 +6,13 @@ WORKDIR /
 
 # Install S3 client
 RUN apt-get update && \
-    apt-get install -y cron python-pip supervisor && \
-    pip install boto3 && \
-    mkdir -p /var/log/supervisor 
+    apt-get install -y cron python-pip && \
+    pip install boto3
 
 ADD crontab /etc/cron.d/compactor-cron
 RUN (crontab -l; cat /etc/cron.d/compactor-cron | crontab; crontab -l)
 
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY supervisord.conf /supervisord.conf
 COPY master.sh /
 COPY runTasks.py /
 
