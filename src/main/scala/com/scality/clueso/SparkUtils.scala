@@ -51,6 +51,7 @@ object SparkUtils extends LazyLogging {
       .config("spark.hadoop.fs.s3a.path.style.access", config.s3PathStyleAccess)
       .config("spark.sql.streaming.metricsEnabled", "true")
       .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+      .config("spark.ui.port", config.sparkUiPort)
   }
 
   def confSparkSession(spark : SparkSession, config : CluesoConfig) = {
