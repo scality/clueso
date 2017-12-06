@@ -85,10 +85,9 @@ object LandingMetadataPopulatorTool extends LazyLogging {
         ), CluesoConstants.eventValueSchema)
 
         val opIndex = "%012d_%d".format(recordNo,Random.nextInt(200))
+        val nextOpIndex = MetadataIngestionPipeline.findNextMaxOpIndexFun(compactionRecordInterval, opIndex).toString
 
-
-        val values : Array[Any] = Array(bucketName, key, opIndex,
-          MetadataIngestionPipeline.findNextMaxOpIndexFun(compactionRecordInterval, opIndex).toString,
+        val values : Array[Any] = Array(bucketName, key, opIndex, nextOpIndex,
           eventType, message)
 
         new GenericRowWithSchema(values, CluesoConstants.storedEventSchema).asInstanceOf[Row]
