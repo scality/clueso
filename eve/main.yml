@@ -1,0 +1,35 @@
+---
+
+branches:
+  default:
+    stage: pre-merge
+models:
+stages:
+  pre-merge:
+    worker:
+      type: openstack
+      image: CentOS 7 (PVHVM)
+      flavor: general1-8
+      path: eve/workers/build
+    steps:
+      - Git: &clone
+         name: Pull repo
+         repourl: '%(prop:git_reference)s'
+         shallow: True
+         retryFetch: True
+         haltOnFailure: True
+      - ShellCommand:
+         name: Submodules
+         command: git submodule init && git submodule update
+         haltOnFailure: True
+      - ShellCommand:
+         name: Machine Dependencies
+         command: sudo bash %(prop:worker_path)s/vm-setup.sh
+         haltOnFailure: True
+      - ShellCommand:
+         name: Build Docker Images
+         command: sudo bash ./gradlew clean buildDocker
+         haltOnFailure: True
+      - ShellCommand:
+         name: Run Integration Tests
+         command: sudo bash ./gradlew clean test
