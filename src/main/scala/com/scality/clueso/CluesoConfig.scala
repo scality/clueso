@@ -15,6 +15,8 @@ class CluesoConfig(config: Config) {
 
   def sparkSqlPrintExplain = envOrElseConfig("spark_sql_print_explain").toBoolean
 
+  def sparkUiPort = config.getInt("spark_ui_port")
+
   // storage params
   def s3SslEnabled = envOrElseConfig("s3_ssl_enabled")
   def s3Endpoint = envOrElseConfig("s3_endpoint")
