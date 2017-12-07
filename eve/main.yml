@@ -32,4 +32,5 @@ stages:
          haltOnFailure: True
       - ShellCommand:
          name: Run Integration Tests
-         command: sudo bash ./gradlew clean test
+         command: |
+           sudo bash ./gradlew clean test || (cat build/reports/tests/test/index.html && exit 1)
