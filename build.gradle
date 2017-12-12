@@ -234,7 +234,7 @@ task buildLivyImage(type: DockerBuildImage) {
     dependsOn buildSparkBaseImage
 
     inputDir = file('docker/images/clueso-docker-livy')
-    tag = 'scality/clueso-livy:0.4.0'
+    tag = 'scality/clueso-livy:latest'
 }
 
 task buildDocker() {

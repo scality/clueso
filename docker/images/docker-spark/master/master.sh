@@ -21,14 +21,14 @@ if curl --fail -X POST --output /dev/null --silent --head http://127.0.0.1:8080;
      printf 'Waiting for Spark Master...'
      until $(curl --output /dev/null --silent --head --fail http://127.0.0.1:8080); do
           printf '.'
-          sleep 5
+          sleep 1
      done
 fi
 
 ## Supervisor will monitor the ingestion to ensure it stays up
 supervisord -c /supervisord.conf
 
-export SPARK_MASTER_IP=`hostname`
+export SPARK_MASTER_HOST=`hostname`
 
 . "/spark/sbin/spark-config.sh"
 
@@ -37,6 +37,6 @@ export SPARK_MASTER_IP=`hostname`
 mkdir -p $SPARK_MASTER_LOG
 
 /spark/bin/spark-class org.apache.spark.deploy.master.Master \
-    --host $SPARK_MASTER_IP --port $SPARK_MASTER_PORT --webui-port $SPARK_MASTER_WEBUI_PORT >> $SPARK_MASTER_LOG/spark-master.out
+    --host $SPARK_MASTER_HOST --port $SPARK_MASTER_PORT --webui-port $SPARK_MASTER_WEBUI_PORT >> $SPARK_MASTER_LOG/spark-master.out
 
 
