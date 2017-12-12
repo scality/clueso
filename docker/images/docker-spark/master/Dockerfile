@@ -1,4 +1,4 @@
-FROM scality/clueso-spark-base:hadoop2.8
+FROM scality/clueso-spark-base:latest
 
 HEALTHCHECK CMD curl -f http://localhost:8080/ || exit 1
 
@@ -12,6 +12,7 @@ RUN apt-get update && \
 ADD crontab /etc/cron.d/compactor-cron
 RUN (crontab -l; cat /etc/cron.d/compactor-cron | crontab; crontab -l)
 
+COPY supervisord.conf /supervisord.conf
 COPY master.sh /
 COPY runTasks.py /
 

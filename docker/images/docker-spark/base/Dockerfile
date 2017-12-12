@@ -10,13 +10,11 @@ ENV SPARK_VERSION 2.1.1_2.11
 # once spark is packaged with hadoop 2.8 we can stop compiling
 # https://issues.apache.org/jira/browse/HADOOP-12963
 RUN apt-get update \
-    && apt-get install -y supervisor curl build-essential \
-    python git maven --no-install-recommends \
+    && apt-get install -y curl netcat supervisor curl \
+    build-essential python git maven --no-install-recommends \
     && mkdir -p /var/log/supervisor \
     && curl --retry 6 \
     -fSL https://www.apache.org/dist/hadoop/common/hadoop-$HADOOP_VERSION/hadoop-$HADOOP_VERSION.tar.gz -o /tmp/hadoop.tar.gz \
-    && apt-get install -y supervisor curl --no-install-recommends \
-    && mkdir -p /var/log/supervisor \
     && tar -xvf /tmp/hadoop.tar.gz -C /opt/ \
     && rm /tmp/hadoop.tar.gz \
     && mkdir -p /apps/build/ \
@@ -41,5 +39,6 @@ COPY clueso /clueso
 RUN mkdir -p /clueso/heapdumps && mkdir -p /clueso/conf/
 COPY application.conf /clueso/conf/
 COPY conf /spark/conf/ 
-
+## Java DNS caching setting to prevent inter-container communication issues
+RUN echo 'networkaddress.cache.ttl=20' >> $JAVA_HOME/jre/lib/security/java.security
 CMD bash

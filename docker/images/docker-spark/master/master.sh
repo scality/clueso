@@ -1,4 +1,5 @@
 #!/bin/bash
+set -eo pipefail
 
 # s3 secret credentials for Zenko
 if [ -r /run/secrets/s3-credentials ] ; then
@@ -20,28 +21,14 @@ if curl --fail -X POST --output /dev/null --silent --head http://127.0.0.1:8080;
      printf 'Waiting for Spark Master...'
      until $(curl --output /dev/null --silent --head --fail http://127.0.0.1:8080); do
           printf '.'
-          sleep 5
+          sleep 1
      done
 fi
 
-echo "Executing Clueso Pipeline in background..."
-# TODO put something to restart java pipeline in case this fails (non 0 return code)
-java -cp /spark/conf:/spark/jars/* \
-     -Xmx512m org.apache.spark.deploy.SparkSubmit \
-     --conf spark.executor.memory=512m \
-     --conf spark.driver.memory=512m \
-     --conf spark.master=spark://spark-master:7077 \
-     --conf spark.driver.cores=1 \
-     --conf spark.cores.max=2 \
-     --conf spark.executor.cores=1 \
-     --queue default \
-     --class com.scality.clueso.MetadataIngestionPipeline \
-     --name "Clueso Metadata Ingestion Pipeline" \
-     file:///clueso/lib/clueso.jar /clueso/conf/application.conf &
+## Supervisor will monitor the ingestion to ensure it stays up
+supervisord -c /supervisord.conf
 
-
-
-export SPARK_MASTER_IP=`hostname`
+export SPARK_MASTER_HOST=`hostname`
 
 . "/spark/sbin/spark-config.sh"
 
@@ -50,6 +37,6 @@ export SPARK_MASTER_IP=`hostname`
 mkdir -p $SPARK_MASTER_LOG
 
 /spark/bin/spark-class org.apache.spark.deploy.master.Master \
-    --host $SPARK_MASTER_IP --port $SPARK_MASTER_PORT --webui-port $SPARK_MASTER_WEBUI_PORT >> $SPARK_MASTER_LOG/spark-master.out
+    --host $SPARK_MASTER_HOST --port $SPARK_MASTER_PORT --webui-port $SPARK_MASTER_WEBUI_PORT >> $SPARK_MASTER_LOG/spark-master.out
 
 

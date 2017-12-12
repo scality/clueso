@@ -1,4 +1,4 @@
-FROM scality/clueso-spark-base:hadoop2.8
+FROM scality/clueso-spark-base:latest
 
 HEALTHCHECK CMD curl -f http://localhost:8081/ || exit 1
 
