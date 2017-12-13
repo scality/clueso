@@ -1,7 +1,7 @@
 FROM kamon/grafana_graphite
 
-ADD ./conf/grafana/dashboards/* /src/dashboards/
+COPY ./clueso-dashboard.json /src/dashboards/
 
 EXPOSE 80 81 2003 8125 8126
 
-CMD     ["/usr/bin/supervisord"]
+CMD ["/usr/bin/supervisord", "--nodaemon", "--configuration", "/etc/supervisor/conf.d/supervisord.conf"]
