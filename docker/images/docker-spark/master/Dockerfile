@@ -12,9 +12,13 @@ RUN apt-get update && \
 ADD crontab /etc/cron.d/compactor-cron
 RUN (crontab -l; cat /etc/cron.d/compactor-cron | crontab; crontab -l)
 
-COPY supervisord.conf /supervisord.conf
+# Prevents supervisor from starting ingestion prematurely
+RUN service supervisor stop
+
+COPY supervisord.conf /etc/supervisor/supervisord.conf
 COPY master.sh /
 COPY runTasks.py /
+COPY startup.sh /
 
 ENV SPARK_MASTER_PORT 7077
 ENV SPARK_MASTER_WEBUI_PORT 8080
@@ -22,4 +26,4 @@ ENV SPARK_MASTER_LOG /spark/logs
 
 EXPOSE 8080 7077 6066
 
-CMD ["/bin/bash", "/master.sh"]
+CMD ["/bin/bash", "/startup.sh"]
