@@ -19,6 +19,7 @@ COPY supervisord.conf /etc/supervisor/supervisord.conf
 COPY master.sh /
 COPY runTasks.py /
 COPY startup.sh /
+COPY getPensieveCreds-linux /
 
 ENV SPARK_MASTER_PORT 7077
 ENV SPARK_MASTER_WEBUI_PORT 8080

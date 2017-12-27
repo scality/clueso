@@ -1,6 +1,6 @@
 package com.scality.clueso
 
-import com.fasterxml.jackson.databind.node.{ArrayNode, NullNode, ObjectNode, TextNode}
+import com.fasterxml.jackson.databind.node._
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
@@ -16,44 +16,48 @@ class EventMessageRewriter {
 
   def rewriteMsg(bytes: Array[Byte]): String = {
     val payload = new String(bytes)
+    try {
+      var rootNode = mapper.readTree(payload).asInstanceOf[ObjectNode]
 
-    var rootNode = mapper.readTree(payload).asInstanceOf[ObjectNode]
+      val valueTxtNode = rootNode.path("value").asInstanceOf[TextNode]
 
-    val valueTxtNode = rootNode.path("value").asInstanceOf[TextNode]
+      val valueNodeString = mapper.readTree(valueTxtNode.asText())
+      val valueNode = valueNodeString.asInstanceOf[ObjectNode]
 
-    // parses "value" text contents as new json object
-    val valueNode = mapper.readTree(valueTxtNode.asText()).asInstanceOf[ObjectNode]
+      val metadataFieldNames = mutable.ListBuffer[String]()
 
-    val metadataFieldNames = mutable.ListBuffer[String]()
+      val it = valueNode.fieldNames()
+      while (it.hasNext) {
+        val fieldName = it.next()
+        if (fieldName.startsWith("x-amz-meta-")) {
+          metadataFieldNames += fieldName
+        } else if (fieldName.equals("location")) {
+          val locationArray = valueNode.path("location")
 
-    val it = valueNode.fieldNames()
-    while (it.hasNext) {
-      val fieldName = it.next()
-      if (fieldName.startsWith("x-amz-meta-")) {
-        metadataFieldNames += fieldName
-      } else if (fieldName.equals("location")) {
-        val locationArray = valueNode.path("location")
-
-        if (!locationArray.isInstanceOf[NullNode] && locationArray.asInstanceOf[ArrayNode].size() > 1) {
-          val _locationArray =  locationArray.asInstanceOf[ArrayNode]
-          (1 until locationArray.size()).foreach(i => _locationArray.remove(i))
-          valueNode.replace("location", _locationArray)
+          if (!locationArray.isInstanceOf[NullNode] && locationArray.asInstanceOf[ArrayNode].size() > 1) {
+            val _locationArray = locationArray.asInstanceOf[ArrayNode]
+            (1 until locationArray.size()).foreach(i => _locationArray.remove(i))
+            valueNode.replace("location", _locationArray)
+          }
         }
       }
+
+      val userMd = valueNode.putObject("userMd")
+
+      for (fieldName <- metadataFieldNames) {
+        userMd.set(fieldName, valueNode.path(fieldName).deepCopy().asInstanceOf[JsonNode])
+        valueNode.remove(fieldName)
+      }
+
+      valueNode.replace("userMd", userMd)
+      rootNode.replace("value", valueNode)
+
+      mapper.writeValueAsString(rootNode)
+    } catch {
+      case e:Throwable => ""
     }
 
-    val userMd = valueNode.putObject("userMd")
-
-    for (fieldName <- metadataFieldNames) {
-      userMd.set(fieldName, valueNode.path(fieldName).deepCopy().asInstanceOf[JsonNode])
-      valueNode.remove(fieldName)
     }
-
-    valueNode.replace("userMd", userMd)
-    rootNode.replace("value", valueNode)
-
-    mapper.writeValueAsString(rootNode)
-  }
 }
 
 object EventMessageRewriterWrapper {
@@ -97,6 +101,7 @@ object MetadataIngestionPipeline extends LazyLogging {
 
     // defensive filtering to not process kafka garbage
     df = df.filter(col("content").isNotNull)
+      // msg_rewrite will return an empty string if parsing json throws
           .filter(length(col("content")).gt(3))
           .select(
             from_json(col("content"), CluesoConstants.eventSchema).alias("event")
@@ -123,7 +128,10 @@ object MetadataIngestionPipeline extends LazyLogging {
       !col("bucket").eqNullSafe(bucketNameToFilterOut) &&
         !col("bucket").eqNullSafe("users..bucket") &&
         !col("bucket").eqNullSafe("__metastore") &&
-        (col("bucket").isNotNull && !col("bucket").startsWith("mpuShadowBucket")))
+        !col("bucket").eqNullSafe("PENSIEVE") &&
+        (col("bucket").isNotNull && !col("bucket").startsWith("mpuShadowBucket"))
+    )
+
 
       df.drop("event")
   }
