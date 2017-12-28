@@ -1,5 +1,6 @@
 package com.scality.clueso
 
+import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.node._
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.Config
@@ -11,8 +12,10 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import scala.collection.mutable
 
-class EventMessageRewriter {
+class EventMessageRewriter extends LazyLogging {
   val mapper = new ObjectMapper()
+  // needed for the null character (\0 or \u0000) in our versioned key names
+  mapper.configure(JsonParser.Feature.ALLOW_UNQUOTED_CONTROL_CHARS, true)
 
   def rewriteMsg(bytes: Array[Byte]): String = {
     val payload = new String(bytes)
@@ -54,7 +57,9 @@ class EventMessageRewriter {
 
       mapper.writeValueAsString(rootNode)
     } catch {
-      case e:Throwable => ""
+      case e:Throwable =>
+        logger.error(s"Error parsing json entry from kafka ${e}")
+        ""
     }
 
     }
@@ -131,7 +136,6 @@ object MetadataIngestionPipeline extends LazyLogging {
         !col("bucket").eqNullSafe("PENSIEVE") &&
         (col("bucket").isNotNull && !col("bucket").startsWith("mpuShadowBucket"))
     )
-
 
       df.drop("event")
   }
