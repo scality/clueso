@@ -1,4 +1,4 @@
-FROM scality/clueso-spark-base:hadoop2.8 as base
+FROM scality/clueso-spark-base:latest as base
 FROM ubuntu
 
 # packages
