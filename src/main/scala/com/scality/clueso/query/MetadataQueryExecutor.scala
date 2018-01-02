@@ -79,6 +79,9 @@ class MetadataQueryExecutor(spark : SparkSession, config : CluesoConfig) extends
 
     val result = resultDf
       .select(CluesoConstants.resultCols: _*)
+      // filter out versioned keys that contain null character (\0 or \u0000)
+      // TODO to do versioned listings need to make this filter based on query
+      .filter(!(col("key") contains "\u0000"))
       .orderBy(col("key"))
       .limit(query.limit)
 

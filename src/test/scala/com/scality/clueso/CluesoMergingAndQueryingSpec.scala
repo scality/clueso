@@ -18,7 +18,6 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
         import spark.implicits._
         implicit val _spark = spark
         implicit val _config = config
-
         val fs = SparkUtils.buildHadoopFs(config)
         fs.mkdirs(new Path(PathUtils.stagingURI))
 
@@ -338,6 +337,44 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
 
         // then same result as before
         result.count() shouldBe 2
+    }
+    "Scenario 6: only retrieves the master keys (not version keys)" in withSparkContext {
+      (spark: SparkSession, config: CluesoConfig) =>
+
+        import spark.implicits._
+        implicit val _spark = spark
+        implicit val _config = config
+
+        val fs = SparkUtils.buildHadoopFs(config)
+        fs.mkdirs(new Path(PathUtils.stagingURI))
+
+        val now = new java.util.Date().getTime
+
+        val randomBucketName = s"testbucket${Random.nextInt(10000)}"
+
+        val landingData = Seq(
+          (new Timestamp(now), """{"opIndex":"000006636351_000000","type":"put","bucket":"""" + randomBucketName + """","key":"sample","value":"{ \"md-model-version\":3,\"owner-display-name\":\"CustomAccount\",\"owner-id\":\"12349df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47qwer\",\"content-length\":13,\"last-modified\":\"2017-08-08T03:57:02.249Z\",\"content-md5\":\"4b02d12ad7f063d67aec9dc2116a57a2\",\"x-amz-version-id\":\"null\",\"x-amz-server-version-id\":\"\",\"x-amz-storage-class\":\"STANDARD\",\"x-amz-server-side-encryption\":\"\",\"x-amz-server-side-encryption-aws-kms-key-id\":\"\",\"x-amz-server-side-encryption-customer-algorithm\":\"\",\"x-amz-website-redirect-location\":\"\",\"acl\":{\"Canned\":\"private\",\"FULL_CONTROL\":[],\"WRITE_ACP\":[],\"READ\":[],\"READ_ACP\":[]},\"key\":\"\",\"location\":[{\"key\":\"12cb0b112d663e73effb32c58fe3fab9f4bd002c\",\"size\":13,\"start\":0,\"dataStoreName\":\"file\",\"dataStoreETag\":\"1:4b02d12ad7f063d67aec9dc2116a57a2\"}],\"isDeleteMarker\":false,\"tags\":{},\"replicationInfo\":{\"status\":\"\",\"content\":[],\"destination\":\"\",\"storageClass\":\"\",\"role\":\"\"},\"dataStoreName\":\"us-east-1\", \"x-amz-meta-verymeta\":\"2\",\"x-amz-meta-color\":\"blue\",\"x-amz-meta-dog\":\"retriever\",\"x-amz-meta-more\":\"morefun\",\"x-amz-meta-words\":\"runningout\",\"x-amz-meta-evenmore\":\"evenmorefun\",\"x-amz-meta-keepitup\":\"5\",\"x-amz-meta-mymeta1\":\"thisisfun\",\"x-amz-meta-mymeta2\":\"thisisfun2\"}"}"""),
+          (new Timestamp(now + 10000), """{"opIndex":"000006636352_000000","type":"put","bucket":"""" + randomBucketName + """","key":"sample2\u000098485577508342999999RG001","value":"{ \"md-model-version\":3,\"owner-display-name\":\"CustomAccount\",\"owner-id\":\"12349df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47qwer\",\"content-length\":13,\"last-modified\":\"2017-08-08T03:57:02.249Z\",\"content-md5\":\"4b02d12ad7f063d67aec9dc2116a57a2\",\"x-amz-version-id\":\"null\",\"x-amz-server-version-id\":\"\",\"x-amz-storage-class\":\"STANDARD\",\"x-amz-server-side-encryption\":\"\",\"x-amz-server-side-encryption-aws-kms-key-id\":\"\",\"x-amz-server-side-encryption-customer-algorithm\":\"\",\"x-amz-website-redirect-location\":\"\",\"acl\":{\"Canned\":\"private\",\"FULL_CONTROL\":[],\"WRITE_ACP\":[],\"READ\":[],\"READ_ACP\":[]},\"key\":\"\",\"location\":[{\"key\":\"12cb0b112d663e73effb32c58fe3fab9f4bd002c\",\"size\":13,\"start\":0,\"dataStoreName\":\"file\",\"dataStoreETag\":\"1:4b02d12ad7f063d67aec9dc2116a57a2\"}],\"isDeleteMarker\":false,\"tags\":{},\"replicationInfo\":{\"status\":\"\",\"content\":[],\"destination\":\"\",\"storageClass\":\"\",\"role\":\"\"},\"dataStoreName\":\"us-east-1\", \"x-amz-meta-verymeta\":\"2\",\"x-amz-meta-color\":\"blue\",\"x-amz-meta-dog\":\"retriever\",\"x-amz-meta-more\":\"morefun\",\"x-amz-meta-words\":\"runningout\",\"x-amz-meta-evenmore\":\"evenmorefun\",\"x-amz-meta-keepitup\":\"5\",\"x-amz-meta-mymeta2\":\"thisisfun2\"}"}""")
+        )
+
+        // when we have Landing with a versioned key
+        val landingDf = landingData.toDF("timestamp", "value")
+        val stream = MetadataIngestionPipeline.filterAndParseEvents(config.bucketName, landingDf)
+        // ingestion should take master key and version key
+        stream.count shouldBe 2
+        stream.write
+          .partitionBy("bucket", "maxOpIndex")
+          .parquet(PathUtils.landingURI)
+
+        val queryExecutor = MetadataQueryExecutor(spark, config)
+
+        // given
+        val query = MetadataQuery(randomBucketName, """ userMd.`x-amz-meta-mymeta2` = 'thisisfun2' """, None, 1000)
+        var result = queryExecutor.execute(query)
+        // then search should only retrieve master key
+        result.count() shouldBe 1
+        var maybeB = result.take(1).head
+        maybeB.getString(maybeB.fieldIndex("key")) shouldEqual "sample"
     }
   }
 }
