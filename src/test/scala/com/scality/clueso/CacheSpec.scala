@@ -16,24 +16,51 @@ class CacheSpec extends WordSpec with Matchers with SparkContextSetup {
         fs.mkdirs(new Path(PathUtils.stagingURI))
         fs.mkdirs(new Path(PathUtils.landingURI))
         fs.mkdirs(new Path(PathUtils.landingURI concat("/bucket=") concat(bucketName)))
-        val df = SessionCacheManager.getCachedBucketDataframe(spark, bucketName)(config)
-        SessionCacheManager.bucketDfs(bucketName).get() should be theSameInstanceAs df
-        df.count() shouldBe 0
 
         // populate landing
         val numberParquetFiles = "10"
+        val originalEntries = "15"
         val configPath = getClass.getResource("/application.conf").toString.substring(5)
-        LandingMetadataPopulatorTool.main(Array(configPath, bucketName, "10", numberParquetFiles))
+        LandingMetadataPopulatorTool.main(Array(configPath, bucketName, originalEntries, numberParquetFiles))
 
-        // wait to update cache
+        val df = SessionCacheManager.getCachedBucketDataframe(spark, bucketName)(config)
+        SessionCacheManager.bucketDfs(bucketName).get() should be theSameInstanceAs df
+        df.count() shouldBe originalEntries.toInt
+
+        // populate landing again
+        val updatedEntries = "10"
+        LandingMetadataPopulatorTool.main(Array(configPath, bucketName, updatedEntries, numberParquetFiles))
+
+        // checking that retrieve stale data from cache since cache has not expired
+        val staleDf = SessionCacheManager.getCachedBucketDataframe(spark, bucketName)(config)
+        SessionCacheManager.bucketDfs(bucketName).get() should be theSameInstanceAs df
+        staleDf.count() shouldBe originalEntries.toInt
+
+        // wait for cache to update
         val wait = config.cacheExpiry.toMillis + 1000
         logger.info(s"Sleeping so cache expires for $wait ms")
         Thread.sleep(wait)
 
+        // updated cache should only have new entries
         val updatedDf = SessionCacheManager.getCachedBucketDataframe(spark, bucketName)(config)
-        updatedDf.count shouldEqual 10
-        SessionCacheManager.bucketDfs(bucketName).get().count() shouldEqual 10
+        updatedDf.count shouldEqual (updatedEntries.toInt)
+        SessionCacheManager.bucketDfs(bucketName).get().count() shouldEqual (updatedEntries.toInt)
         SessionCacheManager.bucketDfs(bucketName).get() should be theSameInstanceAs updatedDf
+
+        // wait to clean up old cache (also means current cache will expire)
+        val cleanupWait = config.cleanPastCacheDelay.toMillis + 3000
+        logger.info(s"Sleeping to wait for old cache cleanup for $cleanupWait ms")
+        Thread.sleep(cleanupWait)
+
+        // repopulate landing again
+        val newNumberParquetFiles = "11"
+        val newEntries = "11"
+        LandingMetadataPopulatorTool.main(Array(configPath, bucketName, newEntries, newNumberParquetFiles))
+
+        // should be able to calculate cache again even though an old cache has been deleted
+        val retryDf = SessionCacheManager.getCachedBucketDataframe(spark, bucketName)(config)
+        SessionCacheManager.bucketDfs(bucketName).get().count() shouldEqual (newEntries.toInt)
+        SessionCacheManager.bucketDfs(bucketName).get() should be theSameInstanceAs retryDf
 
     }
   }
