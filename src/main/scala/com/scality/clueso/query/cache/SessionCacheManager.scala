@@ -26,6 +26,7 @@ object SessionCacheManager extends LazyLogging {
       val bucketDf = setupDf(spark, config, bucketName)
 
       if (acquireLock(bucketName)) {
+        logger.info(s"Cache does not exist. Creating tableView: $tableView")
         bucketDf.createOrReplaceTempView(tableView)
         bucketDf.sparkSession.catalog.cacheTable(tableView)
 
@@ -43,15 +44,15 @@ object SessionCacheManager extends LazyLogging {
         // check if there's a dataframe update going on
         if (acquireLock(bucketName)) {
           logger.info(s"Acquired lock. Calculating view $tableView")
-          val bucketDf = setupDf(spark, config, bucketName, bucketDfs(bucketName).get())
-
+          // calculating view by recalculating staging as well (otherwise, we will constantly accumulate
+          // cache based on prior cache)
+          val bucketDf = setupDf(spark, config, bucketName)
           bucketDf.createOrReplaceTempView(tableView)
 
           // this operation triggers execution
           bucketDf.sparkSession.catalog.cacheTable(tableView)
-
-          logger.info(s"Calculating view $tableView")
-          bucketDf.count() // force calculation
+          // to remove spark metadata
+          spark.catalog.refreshTable(tableView)
           logger.info(s"Atomically swapping DF for bucket = $bucketName ( new = $tableView )")
           val oldDf = bucketDfs.getOrElse(bucketName, new AtomicReference()).getAndSet(bucketDf)
           bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
@@ -63,7 +64,7 @@ object SessionCacheManager extends LazyLogging {
             val sleepDuration = config.cleanPastCacheDelay.toMillis
             logger.info(s"Sleeping cleanPastCacheDelay = $sleepDuration ms")
             Thread.sleep(sleepDuration)
-            logger.info(s"Unpersisting ${oldDf} for $bucketName after having slept $sleepDuration ms")
+            logger.info(s"Unpersisting ${oldDf.rdd.id} for $bucketName after having slept $sleepDuration ms")
             oldDf.unpersist(true)
           }
         }
