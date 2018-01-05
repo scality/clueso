@@ -132,7 +132,7 @@ until the results for that file arrive.
 It assumes the docker stack is running (via docker-compose or docker swarm).
 
 This evaluates both query speed and latency, which may vary depending if cache is enabled and depending on 
-`cache_expiry` in Clueso configuration.
+`landing_cache_expiry` in Clueso configuration.
 
 Results can be published to Graphite and can be visualized using Grafana.
   
