@@ -37,7 +37,7 @@ class CluesoConfig(config: Config) {
   // compaction
   //    as S3 object store is eventual consistency, this sets a minimum 'age' for landing files
   //    to be deleted, avoiding data loss on compaction operation
-  def landingPurgeTolerance = config.getDuration("landing_purge_tolerance")
+  def landingPurgeTolerance = config.getDuration("landing_purge_tolerance").toMillis
 
 
   // pipeline settings
@@ -51,9 +51,8 @@ class CluesoConfig(config: Config) {
 
   // cache settings
   def cacheDataframes = config.hasPath("cache_dataframes") && config.getBoolean("cache_dataframes")
-  def cacheExpiry = config.getDuration("cache_expiry")
-  // controls after how much time should we evict the oldest cache, after finish a new computation
-  def cleanPastCacheDelay = config.getDuration("clean_past_cache_delay")
+  def landingCacheExpiry = config.getDuration("landing_cache_expiry").toMillis
+  def stagingCacheExpiry = Math.min(landingPurgeTolerance - 1000, landingCacheExpiry)
 
   // graphite metrics settings
   def graphiteHost = envOrElseConfig("graphite.hostname")

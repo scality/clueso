@@ -323,7 +323,6 @@ class CluesoMergingAndQueryingSpec extends WordSpec with Matchers with SparkCont
         // then
         result.count() shouldBe 0
 
-
         // given we apply merge
         val compactor = new TableFilesCompactor(spark, config)
         compactor.compactLandingPartition("bucket", randomBucketName, 1, force = true)

@@ -105,6 +105,7 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
     * @param subPartToRemove list of maxOpIndex to remove
     */
   def removeSubpartitionsFromLanding(landingPartitionPath: String, subPartToRemove: Array[String]): Unit = {
+    logger.info(s"Removing subpartitions from landing: ${landingPartitionPath}")
     val subpartitionPaths = fs.listStatus(new Path(landingPartitionPath), new PathFilter {
       override def accept(path: Path): Boolean = {
         // selects all the directories that follow the pattern K=V and with V present in   subPartToCompact   param
@@ -172,9 +173,8 @@ class TableFilesCompactor(spark : SparkSession, implicit val config: CluesoConfi
 
           logger.info(s"Successfully compacted bucket=$bucketNameValue")
 
-          logger.info(s"Waiting ${config.landingPurgeTolerance.toMillis}ms before purging compacted partitions")
-          Thread.sleep(config.landingPurgeTolerance.toMillis)
-
+          logger.info(s"Waiting ${config.landingPurgeTolerance}ms before purging compacted partitions")
+          Thread.sleep(config.landingPurgeTolerance)
           removeSubpartitionsFromLanding(landingPartitionPath, subPartToCompact)
         } else {
           logger.info("No subpartitions to compact.")
