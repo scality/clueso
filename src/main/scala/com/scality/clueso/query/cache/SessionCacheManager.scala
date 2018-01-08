@@ -26,6 +26,7 @@ object SessionCacheManager extends LazyLogging {
       val bucketDf = setupDf(spark, config, bucketName)
 
       if (acquireLock(bucketName)) {
+        logger.info(s"Cache does not exist. Creating tableView: $tableView")
         bucketDf.createOrReplaceTempView(tableView)
         bucketDf.sparkSession.catalog.cacheTable(tableView)
 
@@ -33,46 +34,41 @@ object SessionCacheManager extends LazyLogging {
         bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
         releaseLock(bucketName)
       }
-
+      logger.info(s"Cache does not exist. Created cache for $bucketName")
       bucketDf
     } else {
+      logger.info(s"Cache exists for ${bucketName}")
       // cache exists
       if (bucketUpdateTs(bucketName).plus(config.cacheExpiry.toMillis).isBeforeNow) {
+        logger.info(s"Cache too old for ${bucketName}. Recalculating if can acquire lock.")
         // check if there's a dataframe update going on
         if (acquireLock(bucketName)) {
+          logger.info(s"Acquired lock. Calculating view $tableView")
+          // calculating view by recalculating staging as well (otherwise, we will constantly accumulate
+          // cache based on prior cache)
+          val bucketDf = setupDf(spark, config, bucketName)
+          bucketDf.createOrReplaceTempView(tableView)
 
-          // async update dataframe if there's none already doing it
+          // this operation triggers execution
+          bucketDf.sparkSession.catalog.cacheTable(tableView)
+          // to remove spark metadata
+          spark.catalog.refreshTable(tableView)
+          logger.info(s"Atomically swapping DF for bucket = $bucketName ( new = $tableView )")
+          val oldDf = bucketDfs.getOrElse(bucketName, new AtomicReference()).getAndSet(bucketDf)
+          bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
+          releaseLock(bucketName) // unlock
+
           Future {
-            logger.info(s"Calculating view $tableView")
-            val bucketDf = setupDf(spark, config, bucketName, bucketDfs(bucketName).get())
-
-            bucketDf.createOrReplaceTempView(tableView)
-
-            // this operation triggers execution
-            bucketDf.sparkSession.catalog.cacheTable(tableView)
-
-            bucketDf
-          } map { bucketDf =>
-            logger.info(s"Calculating view $tableView")
-            bucketDf.count() // force calculation
-            logger.info(s"Atomically swapping DF for bucket = $bucketName ( new = $tableView )")
-            val oldDf = bucketDfs.getOrElse(bucketName, new AtomicReference()).getAndSet(bucketDf)
-            bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
-            releaseLock(bucketName) // unlock
-
+            logger.info(s"Async calling sleep to unpersist old df for ${bucketName}")
             // sleep before deleting oldDf
             val sleepDuration = config.cleanPastCacheDelay.toMillis
             logger.info(s"Sleeping cleanPastCacheDelay = $sleepDuration ms")
             Thread.sleep(sleepDuration)
-            logger.info(s"Unpersisting ${oldDf.rdd.name} after $sleepDuration ms")
+            logger.info(s"Unpersisting ${oldDf.rdd.id} for $bucketName after having slept $sleepDuration ms")
             oldDf.unpersist(true)
           }
         }
-
-        // set the time as updated, to avoid triggering it again
-        bucketUpdateTs = bucketUpdateTs.updated(bucketName, DateTime.now())
       }
-
       //  return most recent cached version (always)
       bucketDfs(bucketName).get()
     }
