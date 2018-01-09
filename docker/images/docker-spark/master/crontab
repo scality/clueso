@@ -1,1 +1,1 @@
-* 1 * * * /clueso/bin/table-compactor.sh /clueso/conf/application.conf 4 > /proc/1/fd/1 2>/proc/1/fd/2
+0 1 * * * root /clueso/bin/table-compactor.sh /clueso/conf/application.conf local 4

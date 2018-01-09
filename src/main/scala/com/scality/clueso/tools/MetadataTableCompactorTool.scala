@@ -10,6 +10,7 @@ import com.typesafe.scalalogging.LazyLogging
 object MetadataTableCompactorTool extends LazyLogging {
 
   def main(args: Array[String]): Unit = {
+    logger.info(s"args are ${args.toString()}")
     require(args.length >= 3 && args.length <= 5, "Usage: ./table-compactor.sh <path/to/application.conf> <spark.master> <numPartitions> [<bucket>] [<forceCompaction>]")
 
     val sparkMaster = args(1)
@@ -44,4 +45,3 @@ object MetadataTableCompactorTool extends LazyLogging {
     }
   }
 }
-
