@@ -82,11 +82,25 @@ class SearchMetricsSource(sparkSession: SparkSession, config : CluesoConfig) ext
     */
   val METRIC_SESSION_SEARCHES = metricRegistry.counter(MetricRegistry.name("session_search_count"))
 
+  val rddNamePattern = "In-memory table ([0-9]+)_([A-Za-z0-9_]+)".r
+
+  def parseRddInfoName(rddName: String): (String, String) ={
+    val pattern = this.rddNamePattern
+    var rndNumberVar = ""
+    var bucketNameVar = ""
+    try {
+      val pattern(rndNumber, bucketName) = rddName
+      rndNumberVar = rndNumber
+      bucketNameVar = bucketName
+    } catch {
+      case e: Throwable =>
+        logger.error(s"Thrown err from regEx matching rddInfo.name = ${rddName} ", e)
+    }
+    (rndNumberVar, bucketNameVar)
+  }
   // swipes all available rdd storage info and adds them to the list, if they don't exist already
   def registerRddMetrics(sparkSession: SparkSession): Unit = {
-    val pattern = "In-memory table ([0-9]+)_([A-Za-z]+)".r
-
-
+    val pattern = this.rddNamePattern
     sparkSession.sparkContext.getRDDStorageInfo
       .filter(_.isCached)
       .filter { rddInfo =>
@@ -95,13 +109,13 @@ class SearchMetricsSource(sparkSession: SparkSession, config : CluesoConfig) ext
       pattern.findFirstMatchIn(rddInfo.name).isDefined
     } map { rddInfo =>
 
-      val pattern(rndNumber, bucketName) = rddInfo.name
-
-      logger.info(s"Transforming rddInfo Name = ${rddInfo.name} into $bucketName ")
+      val (rndNumber, bucketName) = parseRddInfoName(rddInfo.name)
+      logger.debug(s"Transforming rddInfo Name = ${rddInfo.name} into $bucketName ")
 
       ((s"${rndNumber}_$bucketName", bucketName), rddInfo)
     } filter { case ((tableName, bucketName), rddInfo) =>
-      val result = !registered.contains(bucketName) || registered.getOrElse(bucketName, "").equals(tableName)
+      val successfullyParsedBucket = bucketName != ""
+      val result = successfullyParsedBucket && !registered.contains(bucketName) || registered.getOrElse(bucketName, "").equals(tableName)
 
       logger.debug(s"Checking presence of $bucketName in registered = ${registered.mkString(",")} ")
 
