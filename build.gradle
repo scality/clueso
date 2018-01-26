@@ -90,8 +90,8 @@ test {
     maxParallelForks = 1
 
     // environment variables for running integration tests
-    environment "AWS_ACCESS_KEY_ID", "accessKey1"
-    environment "AWS_SECRET_ACCESS_KEY", "verySecretKey1"
+    environment "AWS_ACCESS_KEY_ID", "cluesoKey1"
+    environment "AWS_SECRET_ACCESS_KEY", "cluesoSecretKey1"
 }
 
 
