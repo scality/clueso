@@ -4,8 +4,6 @@ services:
     image: jpbarto/boto3
     volumes:
       - ./images/docker-spark/master/runTasks.py:/runTasks.py
-    secrets:
-      - s3-credentials
     environment:
       AWS_ACCESS_KEY_ID: cluesoKey1
       AWS_SECRET_ACCESS_KEY: cluesoSecretKey1
