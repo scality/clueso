@@ -14,7 +14,7 @@ services:
   s3-front:
     build: ./images/S3/
     ports:
-      - "8000"
+      - "8001"
     environment:
       ENDPOINT: "localhost"
       RECORDLOG_ENABLED: "true"
@@ -26,6 +26,6 @@ services:
       - "80:80"
     environment:
       LISTEN_PORT: 80
-      UPSTREAM_SERVER: "s3-front:8000"
+      UPSTREAM_SERVER: "s3-front:8001"
     depends_on:
       - s3-front
