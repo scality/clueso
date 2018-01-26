@@ -14,7 +14,7 @@ services:
   s3-front:
     build: ./images/S3/
     ports:
-      - "8001"
+      - "8001:8001"
     environment:
       ENDPOINT: "localhost"
       RECORDLOG_ENABLED: "true"
