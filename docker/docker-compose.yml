@@ -18,7 +18,8 @@ services:
     environment:
       ENDPOINT: "localhost"
       RECORDLOG_ENABLED: "true"
-    command: S3BACKEND=mem npm start
+      S3BACKEND: "mem"
+    command: npm start
 
   lb:
     image: zenko/loadbalancer
