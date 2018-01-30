@@ -19,6 +19,7 @@ services:
       ENDPOINT: "localhost"
       RECORDLOG_ENABLED: "true"
       S3BACKEND: "mem"
+      REMOTE_MANAGEMENT_DISABLE: "1"
     command: npm start
 
   lb:
