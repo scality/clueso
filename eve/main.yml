@@ -20,7 +20,7 @@ stages:
          haltOnFailure: True
       - ShellCommand:
          name: Submodules
-         command: git submodule init && git submodule update
+         command: git submodule update --init --force --remote
          haltOnFailure: True
       - ShellCommand:
          name: Machine Dependencies
