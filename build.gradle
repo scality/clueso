@@ -104,13 +104,6 @@ dockerCompose {
 }
 
 
-//test.doFirst {
-//    // exposes "${serviceName}_HOST" and "${serviceName}_TCP_${exposedPort}" environment variables
-//    // for example exposes "WEB_HOST" and "WEB_TCP_80" environment variables for service named `web` with exposed port `80`
-//    // if service is scaled using scale option, environment variables will be exposed for each service instance like "WEB_1_HOST", "WEB_1_TCP_80", "WEB_2_HOST", "WEB_2_TCP_80" and so on
-//    dockerCompose.exposeAsEnvironment(test)
-//}
-
 
 apply plugin: com.bmuschko.gradle.docker.DockerRemoteApiPlugin
 
