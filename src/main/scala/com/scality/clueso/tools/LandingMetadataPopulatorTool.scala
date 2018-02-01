@@ -24,11 +24,12 @@ object LandingMetadataPopulatorTool extends LazyLogging {
     val _config = ConfigFactory.load(parsedConfig)
 
     implicit val config = new CluesoConfig(_config)
-
+    config.setSparkUiPort(4051)
     val spark = SparkUtils.buildSparkSession(config)
       .master("local[*]")
       .appName("")
       .getOrCreate()
+
 
     val bucketName = args(1)
     val totalNumRecords = args(2).toLong

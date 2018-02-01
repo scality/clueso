@@ -42,7 +42,7 @@ object MetadataStorageInfoTool extends LazyLogging {
     val _config = ConfigFactory.load(parsedConfig)
 
     val config = new CluesoConfig(_config)
-
+    config.setSparkUiPort(4052)
     val spark = SparkUtils.buildSparkSession(config)
       .master("local[*]")
       .appName("")

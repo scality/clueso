@@ -21,7 +21,7 @@ object MetadataTableCompactorTool extends LazyLogging {
     val _config = ConfigFactory.load(parsedConfig)
 
     val config = new CluesoConfig(_config)
-
+    config.setSparkUiPort(4053)
 
     import java.nio.file.Paths
     val currentJarPath = Paths.get(classOf[TableFilesCompactor].getProtectionDomain.getCodeSource.getLocation.toURI).toString
